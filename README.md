@@ -1,4 +1,4 @@
-Raft Leader Election
+Raft Key Value Server
 =====================
 
 Raft Leader election implements leader election component of [Raft](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf). Raft servers use [cluster](http://github.com/pkhadilkar/cluster) service to send and receive messages. This project currently includes only election component and not log messages. The server term and voted for information is persisted on stable storage.
