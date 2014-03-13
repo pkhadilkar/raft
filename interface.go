@@ -1,21 +1,21 @@
-package elect
+package raft
 
 // Raft object interface.
 // Term returns current server term
 // isLeader returns true on leader and false on followers
 
-interface Raft {
+type Raft interface {
   Term()  int64
   Leader()    int
 
    // Mailbox for state machine layer above to send commands of any
    // kind, and to have them replicated by raft.  If the server is not
    // the leader, the message will be silently dropped.
-   Inbox() <- chan interface{}
+   Inbox() chan <- interface{}
 
    //Mailbox for state machine layer above to receive commands. These
    //are guaranteed to have been replicated on a majority
-   Outbox() <- chan *LogItem
+   Outbox() <- chan *LogEntry
 
    //Remove items from 0 .. index (inclusive), and reclaim disk
    //space. This is a hint, and there's no guarantee of immediacy since
@@ -25,7 +25,7 @@ interface Raft {
 }
 
 // Identifies an entry in the log
-struct LogEntry {
+type LogEntry struct {
    // An index into an abstract 2^64 size array
    Index  int64
 

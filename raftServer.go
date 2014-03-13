@@ -2,7 +2,7 @@
 // ensures that a leader is elected. State of the Raft 
 // servers is stored on stable storage / disk.
 
-package elect
+package raft
 
 import (
 	"encoding/gob"
@@ -29,6 +29,8 @@ const (
 	LEADER
 	CANDIDATE
 )
+// base used in converting term to string
+const TERM_BASE = 10
 
 // TODO: store pointer to raftConfig rather than storing all fields in raftServer
 // raftServer is a concrete implementation of raft Interface
@@ -44,10 +46,12 @@ type raftServer struct {
 	state        *PersistentState // server information that should be persisted
 	config       *RaftConfig      // config information for raftServer
 	sync.Mutex // mutex to protect the state
+	inbox chan interface{} // inbox for raft
+	outbox chan *LogEntry  // outbox for raft, inbox for upper layer
 }
 
 // Term returns current term of a raft server
-func (s *raftServer) Term() int {
+func (s *raftServer) Term() int64 {
 	s.Lock()
 	currentTerm := s.state.Term
 	s.Unlock()
@@ -61,6 +65,23 @@ func (s *raftServer) isLeader() bool {
 	return s.currentState == LEADER
 }
 
+func (s *raftServer) DiscardUpto(index int64) {
+
+}
+
+func (s *raftServer) Inbox() chan <- interface{} {
+	return s.inbox
+}
+
+func (s *raftServer) Outbox() <- chan *LogEntry {
+	return s.outbox
+}
+
+// returns pid of server
+func (s *raftServer) Leader() int {
+	return -1
+}
+
 // follower changes current state of the server
 // to follower
 func (s *raftServer) follower() {
@@ -70,7 +91,7 @@ func (s *raftServer) follower() {
 
 // SetTerm sets the current term of the server
 // The changes are persisted on disk
-func (s *raftServer) setTerm(term int) {
+func (s *raftServer) setTerm(term int64) {
 	s.state.Term = term
 	s.persistState()
 }
@@ -80,7 +101,7 @@ func (s *raftServer) setTerm(term int) {
 // Parameters:
 //  pid  : pid of the server to whom vote is given
 //  term : term for which the vote was granted
-func (s *raftServer) voteFor(pid int, term int) {
+func (s *raftServer) voteFor(pid int, term int64) {
 	s.state.VotedFor = pid
 	s.state.Term = term
 	//TODO: Force this on stable storage

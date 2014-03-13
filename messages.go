@@ -3,7 +3,7 @@
 // Thus, they should really be in a separate raft common
 // package. For now, they are included here for convenience
 
-package elect
+package raft
 
 // enum to indicate type of the message
 const (
@@ -15,7 +15,7 @@ const (
 
 // RequestVote struct is used in Raft leader election
 type RequestVote struct {
-	Term        int // candidate's term
+	Term        int64 // candidate's term
 	CandidateId int // pid of candidate
 }
 
@@ -23,17 +23,17 @@ type RequestVote struct {
 // log messages and hear beats. For this component
 // it only contains term and leaderid
 type AppendEntry struct {
-	Term     int // leader's term
+	Term     int64 // leader's term
 	LeaderId int // pid of the leader
 }
 
 type GrantVote struct {
-	Term        int // currentTerm for candidate
+	Term        int64 // currentTerm for candidate
 	VoteGranted bool
 }
 
 // EntryReply is reply message for AppendEntry request
 type EntryReply struct {
-	Term    int  // replying server's updated current term
+	Term    int64  // replying server's updated current term
 	Success bool // true if AppendEntry was accepted
 }

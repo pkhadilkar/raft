@@ -1,4 +1,4 @@
-package elect
+package raft
 
 import (
 	"github.com/pkhadilkar/cluster"
@@ -91,7 +91,7 @@ func (s *raftServer) startElection() {
 
 				} else if grantV, ok := msg.(GrantVote); ok && grantV.VoteGranted {
 					votes[e.Pid] = true
-					s.writeToLog("Received grantVote message from " + strconv.Itoa(e.Pid) + " with term #" + strconv.Itoa(grantV.Term))
+					s.writeToLog("Received grantVote message from " + strconv.Itoa(e.Pid) + " with term #" + strconv.FormatInt(grantV.Term, TERM_BASE))
 					s.writeToLog("Votes received so far " + strconv.Itoa(len(votes)))
 					if len(votes) == len(peers)/2+1 { // received majority votes
 						s.setState(LEADER)
@@ -120,7 +120,7 @@ func (s *raftServer) startElection() {
 func (s *raftServer) handleRequestVote(from int, rv *RequestVote) bool {
 	acc := false
 	// in currentTerm candidate votes for itself
-	s.writeToLog("Received requestVote message from " + strconv.Itoa(from) + " with term #" + strconv.Itoa(rv.Term))
+	s.writeToLog("Received requestVote message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(rv.Term, TERM_BASE))
 	if (s.VotedFor() == from || s.VotedFor() == NotVoted) && rv.Term >= s.Term() || rv.Term > s.Term() {
 		s.setTerm(rv.Term)
 		s.voteFor(from, s.Term())
@@ -138,7 +138,7 @@ func (s *raftServer) handleRequestVote(from int, rv *RequestVote) bool {
 // when server is in CANDIDATE state
 func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 	acc := false
-	s.writeToLog("Received appendEntry message from " + strconv.Itoa(from) + " with term #" + strconv.Itoa(ae.Term))
+	s.writeToLog("Received appendEntry message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(ae.Term, TERM_BASE))
 	if ae.Term >= s.Term() { // AppendEntry with same or larger term
 		s.setTerm(ae.Term)
 		s.setState(FOLLOWER)

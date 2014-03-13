@@ -1,4 +1,4 @@
-package elect
+package raft
 
 import (
 	"bytes"

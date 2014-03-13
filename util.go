@@ -1,4 +1,4 @@
-package elect
+package raft
 
 import (
 	"encoding/json"
@@ -22,7 +22,7 @@ type RaftConfig struct {
 }
 
 type PersistentState struct {
-	Term     int // last term seen by the server
+	Term     int64 // last term seen by the server
 	VotedFor int // pid of the server voted for
 }
 
@@ -50,7 +50,7 @@ func RaftToClusterConf(r *RaftConfig) *cluster.Config {
 // writeToLog writes a formatted message to log
 // It specifically adds server details to log
 func (s *raftServer) writeToLog(msg string) {
-	s.log.Println(strconv.Itoa(s.server.Pid()) + ": #" + strconv.Itoa(s.Term()) + ":" + msg)
+	s.log.Println(strconv.Itoa(s.server.Pid()) + ": #" + strconv.FormatInt(s.Term(), TERM_BASE) + ":" + msg)
 }
 
 // returns name of the file that is used
