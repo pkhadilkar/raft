@@ -1,4 +1,4 @@
-package raft
+package raftImpl
 
 import (
 	"bytes"

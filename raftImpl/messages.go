@@ -3,7 +3,7 @@
 // Thus, they should really be in a separate raft common
 // package. For now, they are included here for convenience
 
-package raft
+package raftImpl
 
 // enum to indicate type of the message
 const (

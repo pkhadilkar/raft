@@ -1,8 +1,7 @@
-// Raft leader election launches a set of Raft processes and
-// ensures that a leader is elected. State of the Raft 
-// servers is stored on stable storage / disk.
+// Package raftImpl implements Raft server protocol
+// It provides replicated log abstraction.
 
-package raft
+package raftImpl
 
 import (
 	"encoding/gob"
@@ -14,7 +13,9 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"github.com/pkhadilkar/raft"
 	"sync"
+	"github.com/pkhadilkar/raft/llog"
 )
 
 const bufferSize = 100
@@ -38,16 +39,17 @@ type raftServer struct {
 	currentState int            // current state of the server
 	eTimeout     *time.Timer    // timer for election timeout
 	hbTimeout    *time.Timer    // timer to send periodic hearbeats
-	duration     int64          // duration for election timeout
-	hbDuration   int64          // duration to send leader heartbeats
 	server       cluster.Server // cluster server that provides message send/ receive functionality
 	log          *log.Logger    // logger for server to store log messages
 	rng          *rand.Rand
 	state        *PersistentState // server information that should be persisted
 	config       *RaftConfig      // config information for raftServer
-	sync.Mutex // mutex to protect the state
+	sync.RWMutex // mutex to protect the state
 	inbox chan interface{} // inbox for raft
-	outbox chan *LogEntry  // outbox for raft, inbox for upper layer
+	outbox chan *raft.LogEntry  // outbox for raft, inbox for upper layer
+	localLog *llog.LogStore // LogStore dependency. Used to  implement shared log abstraction
+	commitIndex int64 // index of the highest entry known to be committed
+	lastApplied int64 // index of the last entry applied to the log
 }
 
 // Term returns current term of a raft server
@@ -73,7 +75,7 @@ func (s *raftServer) Inbox() chan <- interface{} {
 	return s.inbox
 }
 
-func (s *raftServer) Outbox() <- chan *LogEntry {
+func (s *raftServer) Outbox() <- chan *raft.LogEntry {
 	return s.outbox
 }
 
@@ -171,6 +173,30 @@ func (s *raftServer) Pid() int {
 	return s.server.Pid()
 }
 
+func (s *raftServer) CommitIndex() int64 {
+	s.RLock()
+	defer s.RUnlock()
+	return s.commitIndex
+}
+
+func (s *raftServer) setCommitIndex(index int64) {
+	s.Lock()
+	s.commitIndex = index
+	s.Unlock()
+}
+
+func (s *raftServer) LastApplied() int64 {
+	s.RLock()
+	defer s.RUnlock()
+	return s.lastApplied
+}
+
+func (s *raftServer) setLastApplied(index int64) {
+	s.Lock()
+	s.lastApplied = index
+	s.Unlock()
+}
+
 // incrTerm  increments server's term
 func (s *raftServer) incrTerm() {
 	s.Lock()
@@ -181,19 +207,18 @@ func (s *raftServer) incrTerm() {
 }
 
 //TODO: Load current term from persistent storage
-func New(clusterServer cluster.Server, configFile string) (Raft, error) {
+func New(clusterServer cluster.Server, l *llog.LogStore, configFile string) (raft.Raft, error) {
 	raftConfig, err := ReadConfig(configFile)
 	if err != nil {
 		fmt.Println("Error in reading config file.")
 		return nil, err
 	}
 	// NewWithConfig(pid int, ip string, port int, raftConfig *RaftConfig) (Raft, error) {
-	return NewWithConfig(clusterServer, raftConfig)
+	return NewWithConfig(clusterServer, l, raftConfig)
 }
 
 // function getLog creates a log for a raftServer
 func getLog(s *raftServer, logDirPath string) error {
-	fmt.Println("Creating log at " + logDirPath + "/" + strconv.Itoa(s.server.Pid()) + ".log")
 	f, err := os.Create(logDirPath + "/" + strconv.Itoa(s.server.Pid()) + ".log")
 	if err != nil {
 		fmt.Println("Error: Cannot create log files")
@@ -208,17 +233,16 @@ func getLog(s *raftServer, logDirPath string) error {
 //  clusterServer : Server object of cluster API. cluster.Server provides message send
 //                  receive along with other facilities such as finding peers
 //  raftConfig    : Raft configuration object
-func NewWithConfig(clusterServer cluster.Server, raftConfig *RaftConfig) (Raft, error) {
+func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *RaftConfig) (raft.Raft, error) {
 	s := raftServer{currentState: FOLLOWER, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	s.server = clusterServer
 	s.config = raftConfig
+	s.localLog = l
 	// read persistent state from the disk if server was being restarted as a
 	// part of recovery then it would find the persistent state on the disk
 	s.readPersistentState()
-	s.duration = raftConfig.TimeoutInMillis
-	s.hbDuration = raftConfig.HbTimeoutInMillis
-	s.eTimeout = time.NewTimer(time.Duration(s.duration+s.rng.Int63n(150)) * time.Millisecond) // start timer
-	s.hbTimeout = time.NewTimer(time.Duration(s.duration) * time.Millisecond)
+	s.eTimeout = time.NewTimer(time.Duration(s.config.TimeoutInMillis+s.rng.Int63n(150)) * time.Millisecond) // start timer
+	s.hbTimeout = time.NewTimer(time.Duration(s.config.TimeoutInMillis) * time.Millisecond)
 	s.hbTimeout.Stop()
 	s.state.VotedFor = NotVoted
 
@@ -228,7 +252,7 @@ func NewWithConfig(clusterServer cluster.Server, raftConfig *RaftConfig) (Raft, 
 	}
 	
 	go s.serve()
-	return Raft(&s), err
+	return raft.Raft(&s), err
 }
 
 // registerMessageTypes registers Message types used by

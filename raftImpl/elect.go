@@ -1,4 +1,4 @@
-package raft
+package raftImpl
 
 import (
 	"github.com/pkhadilkar/cluster"
@@ -32,7 +32,7 @@ func (s *raftServer) serve() {
 			if ae, ok := msg.(AppendEntry); ok { // AppendEntry
 				acc := s.handleAppendEntry(e.Pid, &ae)
 				if acc {
-					candidateTimeout := time.Duration(s.duration + s.rng.Int63n(RandomTimeoutRange))
+					candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange))
 					// reset election timer if valid message received from server
 					s.eTimeout.Reset(candidateTimeout * time.Millisecond)
 				}
@@ -49,13 +49,9 @@ func (s *raftServer) serve() {
 			s.startElection()
 			s.writeToLog("Election completed")
 			if s.isLeader() {
-				s.hbTimeout.Reset(time.Duration(s.hbDuration) * time.Millisecond)
+				s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
 				s.eTimeout.Stop() // leader should not time out for election
 			}
-		case <-s.hbTimeout.C:
-			s.writeToLog("Sending hearbeats")
-			s.sendHeartBeat()
-			s.hbTimeout.Reset(time.Duration(s.hbDuration) * time.Millisecond)
 		default:
 			time.Sleep(1 * time.Millisecond) // sleep to avoid busy looping
 		}
@@ -74,7 +70,7 @@ func (s *raftServer) startElection() {
 	s.voteFor(s.server.Pid(), s.Term())
 	for s.State() == CANDIDATE {
 		s.incrTerm()                                                                     // increment term for current
-		candidateTimeout := time.Duration(s.duration + s.rng.Int63n(RandomTimeoutRange)) // random timeout used by Raft authors
+		candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange)) // random timeout used by Raft authors
 		s.sendRequestVote()
 		s.writeToLog("Sent RequestVote message " + strconv.Itoa(int(candidateTimeout)))
 		s.eTimeout.Reset(candidateTimeout * time.Millisecond) // start re-election timer

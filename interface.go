@@ -26,8 +26,11 @@ type Raft interface {
 
 // Identifies an entry in the log
 type LogEntry struct {
-   // An index into an abstract 2^64 size array
+   // An index into an abstract 2^64 array
    Index  int64
+
+   // Term when log entry was created
+   Term int64
 
     // The data that was supplied to raft's inbox
     Data    interface{}
