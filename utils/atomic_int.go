@@ -6,14 +6,14 @@ import (
 
 // AtomicI64 is an int64 data element
 // which is access protected by mutex.
-// Atomic access is guranteed only 
+// Atomic access is guranteed only
 // through Get and Set methods
 type AtomicI64 struct {
 	Value int64
 	sync.RWMutex
 }
 
-// Get returns value of AtomicI64 
+// Get returns value of AtomicI64
 func (a *AtomicI64) Get() int64 {
 	a.RLock()
 	defer a.RUnlock()
@@ -33,7 +33,7 @@ type AtomicInt struct {
 	sync.RWMutex
 }
 
-// Get returns Value of AtomicI64 
+// Get returns Value of AtomicI64
 func (a *AtomicInt) Get() int {
 	a.RLock()
 	defer a.RUnlock()

@@ -38,11 +38,11 @@ const TERM_BASE = 10
 // TODO: store pointer to raftConfig rather than storing all fields in raftServer
 // raftServer is a concrete implementation of raft Interface
 type raftServer struct {
-	currentState *utils.AtomicInt            // current state of the server
-	eTimeout     *time.Timer    // timer for election timeout
-	hbTimeout    *time.Timer    // timer to send periodic hearbeats
-	server       cluster.Server // cluster server that provides message send/ receive functionality
-	log          *log.Logger    // logger for server to store log messages
+	currentState *utils.AtomicInt // current state of the server
+	eTimeout     *time.Timer      // timer for election timeout
+	hbTimeout    *time.Timer      // timer to send periodic hearbeats
+	server       cluster.Server   // cluster server that provides message send/ receive functionality
+	log          *log.Logger      // logger for server to store log messages
 	rng          *rand.Rand
 	state        *PersistentState    // server information that should be persisted
 	config       *RaftConfig         // config information for raftServer
@@ -50,8 +50,8 @@ type raftServer struct {
 	inbox        chan interface{}    // inbox for raft
 	outbox       chan *raft.LogEntry // outbox for raft, inbox for upper layer
 	localLog     *llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
-	commitIndex  *utils.AtomicI64               // index of the highest entry known to be committed
-	lastApplied  *utils.AtomicI64               // index of the last entry applied to the log
+	commitIndex  *utils.AtomicI64    // index of the highest entry known to be committed
+	lastApplied  *utils.AtomicI64    // index of the last entry applied to the log
 }
 
 // Term returns current term of a raft server

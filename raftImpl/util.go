@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pkhadilkar/cluster"
+	"github.com/pkhadilkar/raft/utils"
 	"io/ioutil"
 	"strconv"
-	"github.com/pkhadilkar/raft/utils"
 )
 
 // Config struct represents all config information
@@ -24,7 +24,7 @@ type RaftConfig struct {
 
 type PersistentState struct {
 	Term     *utils.AtomicI64 // last term seen by the server
-	VotedFor *utils.AtomicInt   // pid of the server voted for
+	VotedFor *utils.AtomicInt // pid of the server voted for
 }
 
 // ReadConfig reads configuration file information into Config object

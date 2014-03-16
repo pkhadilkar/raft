@@ -51,8 +51,6 @@ func (s *raftServer) serve() {
 			if s.isLeader() {
 				s.eTimeout.Stop() // leader should not time out for election
 				s.lead()
-			} else {
-				s.hbTimeout.Stop()
 			}
 		}
 	}

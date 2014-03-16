@@ -25,8 +25,9 @@ type RequestVote struct {
 type AppendEntry struct {
 	Term         int64 // leader's term
 	LeaderId     int   // pid of the leader
-	prevLogIndex int64 // index of previous log entry in Leader's log
-	prevLogTerm  int64 // term for previous log entry in Leader's log
+	PrevLogIndex int64 // index of previous log entry in Leader's log
+	PrevLogTerm  int64 // term for previous log entry in Leader's log
+	LeaderCommit int64 // last commited index in Leader's log
 }
 
 type GrantVote struct {

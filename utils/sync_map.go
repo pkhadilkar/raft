@@ -7,22 +7,20 @@ import (
 )
 
 type SyncIntIntMap struct {
-	m map[int]int64 // internal map
-	sync.RWMutex // mutex to synchronize access to map
+	m            map[int]int64 // internal map
+	sync.RWMutex               // mutex to synchronize access to map
 }
-
 
 func CreateSyncIntMap() *SyncIntIntMap {
-	return &SyncIntIntMap{m : make(map[int]int64)}
+	return &SyncIntIntMap{m: make(map[int]int64)}
 }
 
-func (s *SyncIntIntMap) Get(key int) (int64, bool){
+func (s *SyncIntIntMap) Get(key int) (int64, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	val, found := s.m[key]
 	return val, found
 }
-
 
 func (s *SyncIntIntMap) Set(key int, val int64) {
 	s.Lock()
