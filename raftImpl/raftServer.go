@@ -9,6 +9,7 @@ import (
 	"github.com/pkhadilkar/cluster"
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/llog"
+	"github.com/pkhadilkar/raft/utils"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -37,7 +38,7 @@ const TERM_BASE = 10
 // TODO: store pointer to raftConfig rather than storing all fields in raftServer
 // raftServer is a concrete implementation of raft Interface
 type raftServer struct {
-	currentState int            // current state of the server
+	currentState *utils.AtomicInt            // current state of the server
 	eTimeout     *time.Timer    // timer for election timeout
 	hbTimeout    *time.Timer    // timer to send periodic hearbeats
 	server       cluster.Server // cluster server that provides message send/ receive functionality
@@ -49,23 +50,20 @@ type raftServer struct {
 	inbox        chan interface{}    // inbox for raft
 	outbox       chan *raft.LogEntry // outbox for raft, inbox for upper layer
 	localLog     *llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
-	commitIndex  int64               // index of the highest entry known to be committed
-	lastApplied  int64               // index of the last entry applied to the log
+	commitIndex  *utils.AtomicI64               // index of the highest entry known to be committed
+	lastApplied  *utils.AtomicI64               // index of the last entry applied to the log
 }
 
 // Term returns current term of a raft server
 func (s *raftServer) Term() int64 {
-	s.Lock()
-	currentTerm := s.state.Term
-	s.Unlock()
-	return currentTerm
+	return s.state.Term.Get()
 }
 
 // IsLeader returns true if r is a leader and false otherwise
 func (s *raftServer) isLeader() bool {
 	s.Lock()
 	defer s.Unlock()
-	return s.currentState == LEADER
+	return s.currentState.Get() == LEADER
 }
 
 func (s *raftServer) DiscardUpto(index int64) {
@@ -88,7 +86,7 @@ func (s *raftServer) Leader() int {
 // SetTerm sets the current term of the server
 // The changes are persisted on disk
 func (s *raftServer) setTerm(term int64) {
-	s.state.Term = term
+	s.state.Term.Set(term)
 	s.persistState()
 }
 
@@ -98,8 +96,8 @@ func (s *raftServer) setTerm(term int64) {
 //  pid  : pid of the server to whom vote is given
 //  term : term for which the vote was granted
 func (s *raftServer) voteFor(pid int, term int64) {
-	s.state.VotedFor = pid
-	s.state.Term = term
+	s.state.VotedFor.Set(pid)
+	s.state.Term.Set(term)
 	//TODO: Force this on stable storage
 	s.persistState()
 }
@@ -129,7 +127,9 @@ func (s *raftServer) persistState() {
 func (s *raftServer) readPersistentState() {
 	pStateRead, err := ReadPersistentState(s.config.StableStoreDirectoryPath + "/" + ServerFileName(s.server.Pid()))
 	if err != nil {
-		s.state = &PersistentState{VotedFor: NotVoted, Term: 0}
+		vf := &utils.AtomicInt{Value: NotVoted}
+		t := &utils.AtomicI64{Value: 0}
+		s.state = &PersistentState{VotedFor: vf, Term: t}
 		return
 	}
 	s.Lock()
@@ -141,60 +141,28 @@ func (s *raftServer) readPersistentState() {
 // value returned is one of the FOLLOWER,
 // CANDIDATE and LEADER
 func (s *raftServer) State() int {
-	s.Lock()
-	defer s.Unlock()
-	return s.currentState
+	return s.currentState.Get()
 }
 
 // votedFor returns the pid of the server
 // voted for by current server
 func (s *raftServer) VotedFor() int {
-	s.Lock()
-	defer s.Unlock()
-	return s.state.VotedFor
+	return s.state.VotedFor.Get()
 }
 
 // setState sets the state of the server to newState
 // TODO: Add verification for newState
 func (s *raftServer) setState(newState int) {
-	s.Lock()
-	s.currentState = newState
-	s.Unlock()
+	s.currentState.Set(newState)
 }
 
 func (s *raftServer) Pid() int {
 	return s.server.Pid()
 }
 
-func (s *raftServer) CommitIndex() int64 {
-	s.RLock()
-	defer s.RUnlock()
-	return s.commitIndex
-}
-
-func (s *raftServer) setCommitIndex(index int64) {
-	s.Lock()
-	s.commitIndex = index
-	s.Unlock()
-}
-
-func (s *raftServer) LastApplied() int64 {
-	s.RLock()
-	defer s.RUnlock()
-	return s.lastApplied
-}
-
-func (s *raftServer) setLastApplied(index int64) {
-	s.Lock()
-	s.lastApplied = index
-	s.Unlock()
-}
-
 // incrTerm  increments server's term
 func (s *raftServer) incrTerm() {
-	s.Lock()
-	s.state.Term++
-	s.Unlock()
+	s.state.Term.Set(s.state.Term.Get() + 1)
 	// TODO: Is persistState necessary here ?
 	s.persistState()
 }
@@ -227,17 +195,19 @@ func getLog(s *raftServer, logDirPath string) error {
 //                  receive along with other facilities such as finding peers
 //  raftConfig    : Raft configuration object
 func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *RaftConfig) (raft.Raft, error) {
-	s := raftServer{currentState: FOLLOWER, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	s := raftServer{currentState: &utils.AtomicInt{Value: FOLLOWER}, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	s.server = clusterServer
 	s.config = raftConfig
 	s.localLog = l
+	s.commitIndex = &utils.AtomicI64{}
+	s.lastApplied = &utils.AtomicI64{}
 	// read persistent state from the disk if server was being restarted as a
 	// part of recovery then it would find the persistent state on the disk
 	s.readPersistentState()
 	s.eTimeout = time.NewTimer(time.Duration(s.config.TimeoutInMillis+s.rng.Int63n(150)) * time.Millisecond) // start timer
 	s.hbTimeout = time.NewTimer(time.Duration(s.config.TimeoutInMillis) * time.Millisecond)
 	s.hbTimeout.Stop()
-	s.state.VotedFor = NotVoted
+	s.state.VotedFor.Set(NotVoted)
 
 	err := getLog(&s, raftConfig.LogDirectoryPath)
 	if err != nil {

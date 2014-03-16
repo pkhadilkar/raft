@@ -4,7 +4,7 @@ import (
 	"github.com/pkhadilkar/raft/utils"
 	"time"
 	"github.com/pkhadilkar/raft"
-	"fmt"
+//	"fmt"
 )
 
 // this file contains leader's implementation for raft
@@ -13,7 +13,7 @@ import (
 // assume that initial heartbeat has been sent
 func (s *raftServer) lead() {
 	s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
-	// launch a goroutine to handle followers
+	// launch a goroutine to handle followersFormatInt(
 	follower := s.followers()
 	nextIndex, matchIndex := s.initLeader(follower)
 	go s.handleFollowers(follower, nextIndex, matchIndex)
@@ -41,9 +41,20 @@ func (s *raftServer) lead() {
 // about new messages and lagging followers catch up
 func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIntMap, matchIndex *utils.SyncIntIntMap) {
 	/*for f, _ := range followers {
-		
+		lastIndex = s.localLog.TailIndex()
+		n, ok := nextIndex.Get(f)
+		if !ok {
+			panic("nextIndex not found for follower " + strconv.Itoa(f))
+		}
+		if lastIndex >= n {
+			// send a new AppendEntry
+			prevIndex = n - 1
+			prevTerm = s.localLog.Get(prevIndex).Term
+			ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), prevLogIndex: prevIndex, prevLogTerm: prevTerm}
+			ae.leaderCommit = 
+			e := &cluster.Envelope{Pid: cluster.BROADCAST, Msg: ae}
+		}
 	}*/
-	fmt.Println(nextIndex.Get(followers[0]))
 }
 
 // followers returns a slice of follower's pids

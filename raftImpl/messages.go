@@ -23,8 +23,10 @@ type RequestVote struct {
 // log messages and hear beats. For this component
 // it only contains term and leaderid
 type AppendEntry struct {
-	Term     int64 // leader's term
-	LeaderId int   // pid of the leader
+	Term         int64 // leader's term
+	LeaderId     int   // pid of the leader
+	prevLogIndex int64 // index of previous log entry in Leader's log
+	prevLogTerm  int64 // term for previous log entry in Leader's log
 }
 
 type GrantVote struct {
