@@ -7,15 +7,15 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/pkhadilkar/cluster"
+	"github.com/pkhadilkar/raft"
+	"github.com/pkhadilkar/raft/llog"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
 	"strconv"
-	"time"
-	"github.com/pkhadilkar/raft"
 	"sync"
-	"github.com/pkhadilkar/raft/llog"
+	"time"
 )
 
 const bufferSize = 100
@@ -30,6 +30,7 @@ const (
 	LEADER
 	CANDIDATE
 )
+
 // base used in converting term to string
 const TERM_BASE = 10
 
@@ -42,14 +43,14 @@ type raftServer struct {
 	server       cluster.Server // cluster server that provides message send/ receive functionality
 	log          *log.Logger    // logger for server to store log messages
 	rng          *rand.Rand
-	state        *PersistentState // server information that should be persisted
-	config       *RaftConfig      // config information for raftServer
-	sync.RWMutex // mutex to protect the state
-	inbox chan interface{} // inbox for raft
-	outbox chan *raft.LogEntry  // outbox for raft, inbox for upper layer
-	localLog *llog.LogStore // LogStore dependency. Used to  implement shared log abstraction
-	commitIndex int64 // index of the highest entry known to be committed
-	lastApplied int64 // index of the last entry applied to the log
+	state        *PersistentState    // server information that should be persisted
+	config       *RaftConfig         // config information for raftServer
+	sync.RWMutex                     // mutex to protect the state
+	inbox        chan interface{}    // inbox for raft
+	outbox       chan *raft.LogEntry // outbox for raft, inbox for upper layer
+	localLog     *llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
+	commitIndex  int64               // index of the highest entry known to be committed
+	lastApplied  int64               // index of the last entry applied to the log
 }
 
 // Term returns current term of a raft server
@@ -71,24 +72,17 @@ func (s *raftServer) DiscardUpto(index int64) {
 
 }
 
-func (s *raftServer) Inbox() chan <- interface{} {
+func (s *raftServer) Inbox() chan<- interface{} {
 	return s.inbox
 }
 
-func (s *raftServer) Outbox() <- chan *raft.LogEntry {
+func (s *raftServer) Outbox() <-chan *raft.LogEntry {
 	return s.outbox
 }
 
 // returns pid of server
 func (s *raftServer) Leader() int {
 	return -1
-}
-
-// follower changes current state of the server
-// to follower
-func (s *raftServer) follower() {
-	s.hbTimeout.Stop()
-	s.setState(FOLLOWER)
 }
 
 // SetTerm sets the current term of the server
@@ -121,12 +115,11 @@ func (s *raftServer) persistState() {
 		//TODO: Add the state that was encoded. This might help in case of an error
 		panic("Cannot encode PersistentState")
 	}
-	err = ioutil.WriteFile(s.config.StableStoreDirectoryPath+"/" + ServerFileName(s.server.Pid()), pStateBytes, UserReadWriteMode)
+	err = ioutil.WriteFile(s.config.StableStoreDirectoryPath+"/"+ServerFileName(s.server.Pid()), pStateBytes, UserReadWriteMode)
 	if err != nil {
 		panic("Could not persist state to storage on file " + s.config.StableStoreDirectoryPath)
 	}
 }
-
 
 // readPersistentState tries to read the persistent
 // state from the stable storage. It does not panic if
@@ -250,7 +243,7 @@ func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *R
 	if err != nil {
 		return nil, err
 	}
-	
+
 	go s.serve()
 	return raft.Raft(&s), err
 }

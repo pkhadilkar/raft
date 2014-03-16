@@ -49,11 +49,11 @@ func (s *raftServer) serve() {
 			s.startElection()
 			s.writeToLog("Election completed")
 			if s.isLeader() {
-				s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
 				s.eTimeout.Stop() // leader should not time out for election
+				s.lead()
+			} else  {
+				s.hbTimeout.Stop()
 			}
-		default:
-			time.Sleep(1 * time.Millisecond) // sleep to avoid busy looping
 		}
 	}
 }
@@ -69,7 +69,7 @@ func (s *raftServer) startElection() {
 	votes[s.server.Pid()] = true
 	s.voteFor(s.server.Pid(), s.Term())
 	for s.State() == CANDIDATE {
-		s.incrTerm()                                                                     // increment term for current
+		s.incrTerm()                                                                                   // increment term for current
 		candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange)) // random timeout used by Raft authors
 		s.sendRequestVote()
 		s.writeToLog("Sent RequestVote message " + strconv.Itoa(int(candidateTimeout)))
@@ -121,7 +121,7 @@ func (s *raftServer) handleRequestVote(from int, rv *RequestVote) bool {
 		s.setTerm(rv.Term)
 		s.voteFor(from, s.Term())
 		if s.State() != FOLLOWER {
-			s.follower()
+			s.setState(FOLLOWER)
 		}
 		acc = true
 		s.writeToLog("Granting vote to " + strconv.Itoa(from) + ".Changing state to follower")

@@ -23,7 +23,7 @@ type RaftConfig struct {
 
 type PersistentState struct {
 	Term     int64 // last term seen by the server
-	VotedFor int // pid of the server voted for
+	VotedFor int   // pid of the server voted for
 }
 
 // ReadConfig reads configuration file information into Config object
@@ -54,7 +54,7 @@ func (s *raftServer) writeToLog(msg string) {
 }
 
 // returns name of the file that is used
-// to store persistent state of the 
+// to store persistent state of the
 // server on the stable storage
 func ServerFileName(pid int) string {
 	return strconv.Itoa(pid)

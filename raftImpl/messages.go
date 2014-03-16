@@ -16,7 +16,7 @@ const (
 // RequestVote struct is used in Raft leader election
 type RequestVote struct {
 	Term        int64 // candidate's term
-	CandidateId int // pid of candidate
+	CandidateId int   // pid of candidate
 }
 
 // AppendEntries struct is used in Raft for sending
@@ -24,7 +24,7 @@ type RequestVote struct {
 // it only contains term and leaderid
 type AppendEntry struct {
 	Term     int64 // leader's term
-	LeaderId int // pid of the leader
+	LeaderId int   // pid of the leader
 }
 
 type GrantVote struct {
@@ -34,6 +34,6 @@ type GrantVote struct {
 
 // EntryReply is reply message for AppendEntry request
 type EntryReply struct {
-	Term    int64  // replying server's updated current term
-	Success bool // true if AppendEntry was accepted
+	Term    int64 // replying server's updated current term
+	Success bool  // true if AppendEntry was accepted
 }

@@ -10,14 +10,14 @@
 package llog
 
 import (
-	"sync"
 	"github.com/pkhadilkar/raft"
+	"sync"
 )
 
 type LogStore struct {
-	log []*raft.LogEntry // in memory array to store Log entries
-	size int64 // number of entries in log
-	sync.RWMutex // lock to access log immutably
+	log          []*raft.LogEntry // in memory array to store Log entries
+	size         int64            // number of entries in log
+	sync.RWMutex                  // lock to access log immutably
 }
 
 // init initializes LogStore
@@ -27,7 +27,7 @@ func (l *LogStore) Init() {
 }
 
 // append appends a log entry and returns error if any.
-// append also sets internal index of log entry as 
+// append also sets internal index of log entry as
 // server itself need not be aware of index of the log
 // while appending a new entry
 func (l *LogStore) Append(entry *raft.LogEntry) error {
@@ -44,7 +44,7 @@ func (l *LogStore) Append(entry *raft.LogEntry) error {
 // correspond to index in internal implementation
 func (l *LogStore) Get(index int64) *raft.LogEntry {
 	// no need to add error checking here
-	// index accesses are checked at 
+	// index accesses are checked at
 	// runtime
 	l.RLock()
 	defer l.RUnlock()
@@ -55,7 +55,7 @@ func (l *LogStore) Get(index int64) *raft.LogEntry {
 func (l *LogStore) Tail() *raft.LogEntry {
 	l.RLock()
 	defer l.RUnlock()
-	return l.log[l.size - 1]
+	return l.log[l.size-1]
 }
 
 // returns index of the latest entry in the log
