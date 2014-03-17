@@ -32,7 +32,7 @@ type AppendEntry struct {
 	PrevLogIndex int64 // index of previous log entry in Leader's log
 	PrevLogTerm  int64 // term for previous log entry in Leader's log
 	LeaderCommit int64 // last commited index in Leader's log
-	Entry raft.LogEntry 
+	Entry        raft.LogEntry
 }
 
 type GrantVote struct {
@@ -45,8 +45,8 @@ type GrantVote struct {
 // as our replication mechanism does not use true RPC
 // Adding LogIndex makes EntryReply idempotent
 type EntryReply struct {
-	Term    int64 // replying server's updated current term
-	Success bool  // true if AppendEntry was accepted
+	Term     int64 // replying server's updated current term
+	Success  bool  // true if AppendEntry was accepted
 	LogIndex int64 // index of the log entry if AppendEntry call is succesfull
 }
 
@@ -59,7 +59,7 @@ type EntryReply struct {
 // 4. EntryReply delivered to leader. Leader increments
 //    matchIndex for that follower
 // 5. Follower receives second AppendEntry for LogIndex
-//    l and replies affirmative to Leader 
+//    l and replies affirmative to Leader
 // 6. EntryReply is delivered to Leader and leader again
 //    moves matchIndex forward for follower
 // Thus, a matchIndex was skipped for a follower

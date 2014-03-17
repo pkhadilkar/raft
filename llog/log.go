@@ -17,14 +17,14 @@ import (
 
 type LogStore struct {
 	log          []*raft.LogEntry // in memory array to store Log entries
-	nextIndex         int64            // index of the last log entry
+	nextIndex    int64            // index of the last log entry
 	sync.RWMutex                  // lock to access log immutably
 }
 
 // init initializes LogStore
 func (l *LogStore) Init() {
 	l.log = make([]*raft.LogEntry, 1)
-	l.log[0] = &raft.LogEntry{Index : -1, Term: -1} // additional entry to simplify index access
+	l.log[0] = &raft.LogEntry{Index: -1, Term: -1} // additional entry to simplify index access
 	l.nextIndex = 1
 }
 
@@ -77,4 +77,5 @@ func (l *LogStore) Exists(index int64) bool {
 // log index onwards (inclusive)
 func (l *LogStore) DiscardFrom(index int64) {
 	l.log = l.log[:index]
+	l.nextIndex = index
 }

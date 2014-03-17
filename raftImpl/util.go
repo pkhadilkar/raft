@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pkhadilkar/cluster"
+	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
 	"io/ioutil"
 	"strconv"
@@ -67,4 +68,8 @@ func max(x int64, y int64) int64 {
 		larger = y
 	}
 	return larger
+}
+
+func isHeartbeat(entry *raft.LogEntry) bool {
+	return *entry == raft.LogEntry{}
 }

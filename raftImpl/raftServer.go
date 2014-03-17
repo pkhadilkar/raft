@@ -47,11 +47,12 @@ type raftServer struct {
 	state        *PersistentState    // server information that should be persisted
 	config       *RaftConfig         // config information for raftServer
 	sync.RWMutex                     // mutex to protect the state
-	inbox        chan interface{}    // inbox for raft
-	outbox       chan *raft.LogEntry // outbox for raft, inbox for upper layer
+	inbox        chan *raft.LogEntry // inbox for raft
+	outbox       chan interface{}    // outbox for raft, inbox for upper layer
 	localLog     *llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
 	commitIndex  *utils.AtomicI64    // index of the highest entry known to be committed
 	lastApplied  *utils.AtomicI64    // index of the last entry applied to the log
+	leaderId     *utils.AtomicInt    // leader's PID
 }
 
 // Term returns current term of a raft server
@@ -70,11 +71,11 @@ func (s *raftServer) DiscardUpto(index int64) {
 
 }
 
-func (s *raftServer) Inbox() chan<- interface{} {
+func (s *raftServer) Inbox() <-chan *raft.LogEntry {
 	return s.inbox
 }
 
-func (s *raftServer) Outbox() <-chan *raft.LogEntry {
+func (s *raftServer) Outbox() chan<- interface{} {
 	return s.outbox
 }
 
@@ -201,6 +202,8 @@ func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *R
 	s.localLog = l
 	s.commitIndex = &utils.AtomicI64{}
 	s.lastApplied = &utils.AtomicI64{}
+	s.inbox = make(chan *raft.LogEntry, bufferSize)
+	s.outbox = make(chan interface{}, bufferSize)
 	// read persistent state from the disk if server was being restarted as a
 	// part of recovery then it would find the persistent state on the disk
 	s.readPersistentState()

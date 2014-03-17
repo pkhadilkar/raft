@@ -4,8 +4,8 @@ import (
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
 	//	"fmt"
-	"strconv"
 	"github.com/pkhadilkar/cluster"
+	"strconv"
 	"time"
 )
 
@@ -18,16 +18,16 @@ func (s *raftServer) lead() {
 	// launch a goroutine to handle followersFormatInt(
 	follower := s.followers()
 	nextIndex, matchIndex := s.initLeader(follower)
-	
+
 	go s.handleFollowers(follower, nextIndex, matchIndex)
-	
+
 	for s.State() == LEADER {
 		select {
 		case <-s.hbTimeout.C:
 			s.writeToLog("Sending hearbeats")
 			s.sendHeartBeat()
 			s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
-		case msg := <-s.inbox:
+		case msg := <-s.Inbox():
 			// received message from state machine
 			s.localLog.Append(&raft.LogEntry{Term: s.Term(), Data: msg})
 		case e := <-s.server.Inbox():
@@ -42,7 +42,7 @@ func (s *raftServer) lead() {
 				if !found {
 					panic("Next index not found for follower " + strconv.Itoa(e.Pid))
 				} else {
-					m, found =  matchIndex.Get(e.Pid)
+					m, found = matchIndex.Get(e.Pid)
 					if !found {
 						panic("Next index not found for follower " + strconv.Itoa(e.Pid))
 					}
@@ -50,15 +50,15 @@ func (s *raftServer) lead() {
 
 				if entryReply.Success {
 					// update nextIndex for follower
-					nextIndex.Set(e.Pid, max(n + 1, entryReply.LogIndex + 1))
+					nextIndex.Set(e.Pid, max(n+1, entryReply.LogIndex+1))
 					matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
 				} else if s.Term() >= entryReply.Term {
-					nextIndex.Set(e.Pid, n - 1)
+					nextIndex.Set(e.Pid, n-1)
 				} else {
 					s.setState(FOLLOWER)
-					// There are no other goroutines active 
+					// There are no other goroutines active
 					// at this point which modify term
-					if s.Term() >= entryReply.Term  {
+					if s.Term() >= entryReply.Term {
 						panic("Follower replied false even when Leader's term is not smaller")
 					}
 					s.setTerm(entryReply.Term)
@@ -67,7 +67,7 @@ func (s *raftServer) lead() {
 			}
 		}
 	}
-	
+
 	s.hbTimeout.Stop()
 }
 
@@ -122,17 +122,17 @@ func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.S
 // respondToClient replies to the client when
 // an entry is replicated on majority of servers
 func (s *raftServer) respondToClient(followers []int, matchIndex *utils.SyncIntIntMap) {
+
 	for {
 		N := s.commitIndex.Get() + 1
 		upto := N + 1
-		
+
 		for N <= upto {
-			
+
 			if !s.localLog.Exists(N) {
-				time.Sleep(1 * time.Millisecond)
 				break
 			}
-			
+
 			i := 1
 			for f, _ := range followers {
 				if j, _ := matchIndex.Get(f); j >= N {
@@ -141,10 +141,12 @@ func (s *raftServer) respondToClient(followers []int, matchIndex *utils.SyncIntI
 				}
 			}
 			// followers do not include Leader
-			if entry := s.localLog.Get(N); i > (len(followers) + 1) / 2  && entry.Term == s.Term() {
+			if entry := s.localLog.Get(N); i > (len(followers)+1)/2 && entry.Term == s.Term() {
+				s.Outbox() <- s.localLog.Get(N).Data
 				s.commitIndex.Set(N)
 			}
 			N++
 		}
+		time.Sleep(1 * time.Millisecond)
 	}
 }

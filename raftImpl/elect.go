@@ -134,10 +134,14 @@ func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 	acc := false
 	s.writeToLog("Received appendEntry message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(ae.Term, TERM_BASE))
 	if ae.Term >= s.Term() { // AppendEntry with same or larger term
-		if s.localLog.Exists(ae.PrevLogIndex) && s.localLog.Get(ae.PrevLogIndex).Term == ae.PrevLogTerm {
+		s.leaderId.Set(ae.LeaderId)
+		if isHeartbeat(&ae.Entry) {
+			// heartbeat
+			acc = true
+		} else if s.localLog.Exists(ae.PrevLogIndex) && s.localLog.Get(ae.PrevLogIndex).Term == ae.PrevLogTerm {
 			if s.localLog.Exists(ae.Entry.Index) && s.localLog.Get(ae.Entry.Index).Term != ae.Entry.Term {
 				// existing entry conflicts with the entry from the leader
-				
+				s.localLog.DiscardFrom(ae.Entry.Index)
 			}
 			// apply entry to local log
 			s.localLog.Append(&ae.Entry)
