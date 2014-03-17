@@ -64,3 +64,8 @@ func (l *LogStore) TailIndex() int64 {
 	defer l.RUnlock()
 	return l.size - 1
 }
+
+// Exists checks if an entry exists in log
+func (l *LogStore) Exists(index int64) bool {
+	return index < l.size
+}

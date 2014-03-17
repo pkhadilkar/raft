@@ -60,3 +60,11 @@ func (s *raftServer) writeToLog(msg string) {
 func ServerFileName(pid int) string {
 	return strconv.Itoa(pid)
 }
+
+func max(x int64, y int64) int64 {
+	larger := x
+	if y > x {
+		larger = y
+	}
+	return larger
+}

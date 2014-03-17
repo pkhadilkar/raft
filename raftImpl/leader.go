@@ -3,10 +3,10 @@ package raftImpl
 import (
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
-	"time"
 	//	"fmt"
 	"strconv"
 	"github.com/pkhadilkar/cluster"
+	"time"
 )
 
 // this file contains leader's implementation for raft
@@ -37,18 +37,22 @@ func (s *raftServer) lead() {
 			} else if rv, ok := raftMsg.(RequestVote); ok { // RequestVote
 				s.handleRequestVote(e.Pid, &rv)
 			} else if entryReply, ok := raftMsg.(EntryReply); ok {
-				if entryReply.Success {
-					n, found := nextIndex.Get(e.Pid)
+				n, found := nextIndex.Get(e.Pid)
+				var m int64
+				if !found {
+					panic("Next index not found for follower " + strconv.Itoa(e.Pid))
+				} else {
+					m, found =  matchIndex.Get(e.Pid)
 					if !found {
 						panic("Next index not found for follower " + strconv.Itoa(e.Pid))
 					}
+				}
+
+				if entryReply.Success {
 					// update nextIndex for follower
 					nextIndex.Set(e.Pid, n + 1)
+					matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
 				} else if s.Term() >= entryReply.Term {
-					n, found := nextIndex.Get(e.Pid)
-					if !found {
-						panic("Next index not found for follower " + strconv.Itoa(e.Pid))
-					}
 					nextIndex.Set(e.Pid, n - 1)
 				} else {
 					s.setState(FOLLOWER)
@@ -112,4 +116,34 @@ func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.S
 		matchIndex.Set(f, 0)
 	}
 	return nextIndex, matchIndex
+}
+
+// respondToClient replies to the client when
+// an entry is replicated on majority of servers
+func (s *raftServer) respondToClient(followers []int, matchIndex *utils.SyncIntIntMap) {
+	for {
+		N := s.commitIndex.Get() + 1
+		upto := N + 1
+		
+		for N <= upto {
+			
+			if !s.localLog.Exists(N) {
+				time.Sleep(1 * time.Millisecond)
+				break
+			}
+			
+			i := 1
+			for f, _ := range followers {
+				if j, _ := matchIndex.Get(f); j >= N {
+					i++
+					upto = max(upto, j)
+				}
+			}
+			// followers do not include Leader
+			if entry := s.localLog.Get(N); i > (len(followers) + 1) / 2  && entry.Term == s.Term() {
+				s.commitIndex.Set(N)
+			}
+			N++
+		}
+	}
 }

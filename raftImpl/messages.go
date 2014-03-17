@@ -36,7 +36,25 @@ type GrantVote struct {
 }
 
 // EntryReply is reply message for AppendEntry request
+// Note that we have to include LogIndex in EntryReply
+// as our replication mechanism does not use true RPC
+// Adding LogIndex makes EntryReply idempotent
 type EntryReply struct {
 	Term    int64 // replying server's updated current term
 	Success bool  // true if AppendEntry was accepted
+	LogIndex int64 // index of the log entry if AppendEntry call is succesfull
 }
+
+// To see why idempotent EntryReply is necessary in
+// this implementation. Consider following scenario
+// 1. Leader sends AppendEntry for LogIndex l to follower
+// 2. AppendEntry reaches follower and follower replies
+// 3. Leader retries AppendEntry for LogIndex l to
+//    follower before EntryReply is delivered to server
+// 4. EntryReply delivered to leader. Leader increments
+//    matchIndex for that follower
+// 5. Follower receives second AppendEntry for LogIndex
+//    l and replies affirmative to Leader 
+// 6. EntryReply is delivered to Leader and leader again
+//    moves matchIndex forward for follower
+// Thus, a matchIndex was skipped for a follower
