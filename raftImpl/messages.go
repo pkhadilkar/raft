@@ -5,6 +5,10 @@
 
 package raftImpl
 
+import (
+	"github.com/pkhadilkar/raft"
+)
+
 // enum to indicate type of the message
 const (
 	REQ_VOTE = iota
@@ -28,6 +32,7 @@ type AppendEntry struct {
 	PrevLogIndex int64 // index of previous log entry in Leader's log
 	PrevLogTerm  int64 // term for previous log entry in Leader's log
 	LeaderCommit int64 // last commited index in Leader's log
+	Entry raft.LogEntry 
 }
 
 type GrantVote struct {

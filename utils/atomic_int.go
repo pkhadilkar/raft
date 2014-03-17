@@ -10,39 +10,39 @@ import (
 // through Get and Set methods
 type AtomicI64 struct {
 	Value int64
-	sync.RWMutex
+	mutex sync.RWMutex
 }
 
 // Get returns value of AtomicI64
 func (a *AtomicI64) Get() int64 {
-	a.RLock()
-	defer a.RUnlock()
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
 	return a.Value
 }
 
 // Set sets a new value for AtomicI64 object
 func (a *AtomicI64) Set(num int64) {
-	a.Lock()
+	a.mutex.Lock()
 	a.Value = num
-	a.Unlock()
+	a.mutex.Unlock()
 }
 
 // AtomicInt is an int protected by a mutex
 type AtomicInt struct {
 	Value int
-	sync.RWMutex
+	mutex sync.RWMutex
 }
 
 // Get returns Value of AtomicI64
 func (a *AtomicInt) Get() int {
-	a.RLock()
-	defer a.RUnlock()
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
 	return a.Value
 }
 
 // Set sets a new Value for AtomicI64 object
 func (a *AtomicInt) Set(num int) {
-	a.Lock()
+	a.mutex.Lock()
 	a.Value = num
-	a.Unlock()
+	a.mutex.Unlock()
 }

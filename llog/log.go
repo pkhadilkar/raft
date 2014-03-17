@@ -6,7 +6,8 @@
 // struct) may not match as space is reclaimed. LogStore
 // functions interface deals exclusively with logical index
 // of the entry and hides internal details of the LogStore
-// implementation
+// implementation.
+// Note that log indices start at 1 not 0.
 package llog
 
 import (
@@ -16,14 +17,15 @@ import (
 
 type LogStore struct {
 	log          []*raft.LogEntry // in memory array to store Log entries
-	size         int64            // number of entries in log
+	nextIndex         int64            // index of the last log entry
 	sync.RWMutex                  // lock to access log immutably
 }
 
 // init initializes LogStore
 func (l *LogStore) Init() {
-	l.log = make([]*raft.LogEntry, 100)
-	l.size = 0
+	l.log = make([]*raft.LogEntry, 1)
+	l.log[0] = &raft.LogEntry{Index : -1, Term: -1} // additional entry to simplify index access
+	l.nextIndex = 1
 }
 
 // append appends a log entry and returns error if any.
@@ -32,8 +34,8 @@ func (l *LogStore) Init() {
 // while appending a new entry
 func (l *LogStore) Append(entry *raft.LogEntry) error {
 	l.Lock()
-	entry.Index = l.size
-	l.size += 1
+	entry.Index = l.nextIndex
+	l.nextIndex += 1
 	l.log = append(l.log, entry)
 	l.Unlock()
 	return nil
@@ -55,17 +57,24 @@ func (l *LogStore) Get(index int64) *raft.LogEntry {
 func (l *LogStore) Tail() *raft.LogEntry {
 	l.RLock()
 	defer l.RUnlock()
-	return l.log[l.size-1]
+	return l.log[l.TailIndex()]
 }
 
 // returns index of the latest entry in the log
 func (l *LogStore) TailIndex() int64 {
 	l.RLock()
 	defer l.RUnlock()
-	return l.size - 1
+	return l.nextIndex - 1
 }
 
 // Exists checks if an entry exists in log
+// index is the index of the log entry
 func (l *LogStore) Exists(index int64) bool {
-	return index < l.size
+	return index < l.nextIndex
+}
+
+// DiscardFrom discards all entries from
+// log index onwards (inclusive)
+func (l *LogStore) DiscardFrom(index int64) {
+	l.log = l.log[:index]
 }

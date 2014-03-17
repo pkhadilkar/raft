@@ -50,7 +50,7 @@ func (s *raftServer) lead() {
 
 				if entryReply.Success {
 					// update nextIndex for follower
-					nextIndex.Set(e.Pid, n + 1)
+					nextIndex.Set(e.Pid, max(n + 1, entryReply.LogIndex + 1))
 					matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
 				} else if s.Term() >= entryReply.Term {
 					nextIndex.Set(e.Pid, n - 1)
@@ -86,6 +86,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 			prevTerm := s.localLog.Get(prevIndex).Term
 			ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
 			ae.LeaderCommit = s.commitIndex.Get()
+			ae.Entry = *s.localLog.Get(n)
 			s.server.Outbox() <- &cluster.Envelope{Pid: cluster.BROADCAST, Msg: ae}
 		}
 	}
