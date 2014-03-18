@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// this file contains leader's implementation for raft
+// leader's implementation for raft
 
 // lead function is called when server is a leader
 // assume that initial heartbeat has been sent
@@ -20,7 +20,7 @@ func (s *raftServer) lead() {
 	nextIndex, matchIndex := s.initLeader(follower)
 
 	go s.handleFollowers(follower, nextIndex, matchIndex)
-
+	go s.updateCommitIndex(follower, matchIndex)
 	for s.State() == LEADER {
 		select {
 		case <-s.hbTimeout.C:
@@ -74,21 +74,24 @@ func (s *raftServer) lead() {
 // handleFollowers ensures that followers are informed
 // about new messages and lagging followers catch up
 func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIntMap, matchIndex *utils.SyncIntIntMap) {
-	for f, _ := range followers {
-		lastIndex := s.localLog.TailIndex()
-		n, ok := nextIndex.Get(f)
-		if !ok {
-			panic("nextIndex not found for follower " + strconv.Itoa(f))
+	for s.State() == LEADER {
+		for f, _ := range followers {
+			lastIndex := s.localLog.TailIndex()
+			n, ok := nextIndex.Get(f)
+			if !ok {
+				panic("nextIndex not found for follower " + strconv.Itoa(f))
+			}
+			if lastIndex >= n {
+				// send a new AppendEntry
+				prevIndex := n - 1
+				prevTerm := s.localLog.Get(prevIndex).Term
+				ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
+				ae.LeaderCommit = s.commitIndex.Get()
+				ae.Entry = *s.localLog.Get(n)
+				s.server.Outbox() <- &cluster.Envelope{Pid: f, Msg: ae}
+			}
 		}
-		if lastIndex >= n {
-			// send a new AppendEntry
-			prevIndex := n - 1
-			prevTerm := s.localLog.Get(prevIndex).Term
-			ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
-			ae.LeaderCommit = s.commitIndex.Get()
-			ae.Entry = *s.localLog.Get(n)
-			s.server.Outbox() <- &cluster.Envelope{Pid: cluster.BROADCAST, Msg: ae}
-		}
+		time.Sleep(NICE * time.Millisecond)
 	}
 }
 
@@ -107,23 +110,11 @@ func (s *raftServer) followers() []int {
 	return follower
 }
 
-// initLeader initializes important leader data structures
-func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.SyncIntIntMap) {
-	nextIndex := utils.CreateSyncIntMap()
-	matchIndex := utils.CreateSyncIntMap()
-	nextLogEntry := s.localLog.TailIndex()
-	for _, f := range followers {
-		nextIndex.Set(f, nextLogEntry)
-		matchIndex.Set(f, 0)
-	}
-	return nextIndex, matchIndex
-}
-
 // respondToClient replies to the client when
 // an entry is replicated on majority of servers
-func (s *raftServer) respondToClient(followers []int, matchIndex *utils.SyncIntIntMap) {
+func (s *raftServer) updateCommitIndex(followers []int, matchIndex *utils.SyncIntIntMap) {
 
-	for {
+	for s.State() == LEADER {
 		N := s.commitIndex.Get() + 1
 		upto := N + 1
 
@@ -142,11 +133,28 @@ func (s *raftServer) respondToClient(followers []int, matchIndex *utils.SyncIntI
 			}
 			// followers do not include Leader
 			if entry := s.localLog.Get(N); i > (len(followers)+1)/2 && entry.Term == s.Term() {
-				s.Outbox() <- s.localLog.Get(N).Data
 				s.commitIndex.Set(N)
 			}
 			N++
 		}
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(NICE * time.Millisecond)
 	}
+}
+
+// sendHeartBeat sends heartbeat messages to followers
+func (s *raftServer) sendHeartBeat() {
+	e := &cluster.Envelope{Pid: cluster.BROADCAST, Msg: &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid()}}
+	s.server.Outbox() <- e
+}
+
+// initLeader initializes important leader data structures
+func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.SyncIntIntMap) {
+	nextIndex := utils.CreateSyncIntMap()
+	matchIndex := utils.CreateSyncIntMap()
+	nextLogEntry := s.localLog.TailIndex()
+	for _, f := range followers {
+		nextIndex.Set(f, nextLogEntry)
+		matchIndex.Set(f, 0)
+	}
+	return nextIndex, matchIndex
 }

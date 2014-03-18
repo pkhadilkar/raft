@@ -61,6 +61,7 @@ func (l *LogStore) Tail() *raft.LogEntry {
 }
 
 // returns index of the latest entry in the log
+// and 0 if the log does not have any entries
 func (l *LogStore) TailIndex() int64 {
 	l.RLock()
 	defer l.RUnlock()
