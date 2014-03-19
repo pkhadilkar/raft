@@ -33,14 +33,14 @@ type AtomicInt struct {
 	mutex sync.RWMutex
 }
 
-// Get returns Value of AtomicI64
+// Get returns Value of AtomicInt
 func (a *AtomicInt) Get() int {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 	return a.Value
 }
 
-// Set sets a new Value for AtomicI64 object
+// Set sets a new Value for AtomicInt object
 func (a *AtomicInt) Set(num int) {
 	a.mutex.Lock()
 	a.Value = num

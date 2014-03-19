@@ -19,10 +19,10 @@ const (
 
 // RequestVote struct is used in Raft leader election
 type RequestVote struct {
-	Term        int64 // candidate's term
-	CandidateId int   // pid of candidate
+	Term         int64 // candidate's term
+	CandidateId  int   // pid of candidate
 	LastLogIndex int64 // index of the candidate's last log entry
-	LastLogTerm int64 // last term in candidate's log
+	LastLogTerm  int64 // last term in candidate's log
 }
 
 // AppendEntries struct is used in Raft for sending

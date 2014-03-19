@@ -21,6 +21,12 @@ type LogStore struct {
 	sync.RWMutex                  // lock to access log immutably
 }
 
+func Create() *LogStore {
+	l := &LogStore{}
+	l.Init()
+	return l
+}
+
 // init initializes LogStore
 func (l *LogStore) Init() {
 	l.log = make([]*raft.LogEntry, 1)

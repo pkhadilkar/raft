@@ -22,6 +22,7 @@ import (
 const bufferSize = 100
 
 const NotVoted = -1
+const NONE = -1
 
 //TODO: Use separate locks for state and term
 
@@ -81,12 +82,14 @@ func (s *raftServer) Outbox() chan<- interface{} {
 
 // returns pid of server
 func (s *raftServer) Leader() int {
-	return -1
+	return s.leaderId.Get()
 }
 
 // SetTerm sets the current term of the server
 // The changes are persisted on disk
 func (s *raftServer) setTerm(term int64) {
+	// when term changes, reset votedFor
+	s.state.VotedFor.Set(NotVoted)
 	s.state.Term.Set(term)
 	s.persistState()
 }
@@ -163,6 +166,7 @@ func (s *raftServer) Pid() int {
 
 // incrTerm  increments server's term
 func (s *raftServer) incrTerm() {
+	s.state.VotedFor.Set(NotVoted)
 	s.state.Term.Set(s.state.Term.Get() + 1)
 	// TODO: Is persistState necessary here ?
 	s.persistState()
@@ -202,6 +206,7 @@ func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *R
 	s.localLog = l
 	s.commitIndex = &utils.AtomicI64{}
 	s.lastApplied = &utils.AtomicI64{}
+	s.leaderId = &utils.AtomicInt{Value: NONE}
 	s.inbox = make(chan *raft.LogEntry, bufferSize)
 	s.outbox = make(chan interface{}, bufferSize)
 	// read persistent state from the disk if server was being restarted as a

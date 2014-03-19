@@ -2,25 +2,25 @@ package raftImpl
 
 import (
 	"github.com/pkhadilkar/cluster"
-	"time"
 	"strconv"
+	"time"
 )
 
 // this file contains functions common to all Raft servers
 
-const NICE = 1 // amount of time in milliseconds goroutines 
-               // should sleep to release the CPU in
-               // non-event driven functions
+const NICE = 1 // amount of time in milliseconds goroutines
+// should sleep to release the CPU in
+// non-event driven functions
 
 // handleRequestVote  handles RequestVote messages
 // when server is in candidate state
 func (s *raftServer) handleRequestVote(from int, rv *RequestVote) bool {
 	acc := false
-	
-	// in currentTerm candidate votes for itself
-	s.writeToLog("Received requestVote message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(rv.Term, TERM_BASE))
 
-	if (s.VotedFor() == from || s.VotedFor() == NotVoted) && s.isMoreUpToDate(rv.LastLogIndex, rv.LastLogTerm)|| rv.Term > s.Term() {
+	// in currentTerm candidate votes for itself
+	s.writeToLog("Received requestVote message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(rv.Term, TERM_BASE) + "VotedFor = " + strconv.Itoa(s.VotedFor()))
+
+	if (s.VotedFor() == from || s.VotedFor() == NotVoted) && s.isMoreUpToDate(rv.LastLogIndex, rv.LastLogTerm) {
 		s.setTerm(rv.Term)
 		s.voteFor(from, s.Term())
 		if s.State() != FOLLOWER {
@@ -33,8 +33,7 @@ func (s *raftServer) handleRequestVote(from int, rv *RequestVote) bool {
 	return acc
 }
 
-// handleAppendEntry handles AppendEntry messages received
-// when server is in CANDIDATE state
+// handleAppendEntry handles AppendEntry messages
 func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 	acc := false
 	s.writeToLog("Received appendEntry message from " + strconv.Itoa(from) + " with term #" + strconv.FormatInt(ae.Term, TERM_BASE))
@@ -76,13 +75,18 @@ func (s *raftServer) logApply() {
 		if s.commitIndex.Get() > s.lastApplied.Get() {
 			N := s.lastApplied.Get() + 1 // lastApplied is accessed only here
 			s.Outbox() <- s.localLog.Get(N).Data
+			s.writeToLog("Applied log entry at index " + strconv.FormatInt(N, 10))
 			s.lastApplied.Set(N)
 		}
-		time.Sleep(1 * time.Millisecond) // since goroutines are cooperative
+		time.Sleep(NICE * time.Millisecond) // since goroutines are cooperative
 	}
 }
 
 func (s *raftServer) isMoreUpToDate(LastLogIndex int64, LastLogTerm int64) bool {
+	s.writeToLog("LastLogIndex: " + strconv.FormatInt(LastLogIndex, 10) + "\tLastLogTerm: " + strconv.FormatInt(LastLogTerm, 10) )
 	latest := s.localLog.Tail()
+	if latest.Term == -1 && latest.Index == -1 { // log has no entries yet
+		return true
+	}
 	return LastLogTerm > latest.Term || LastLogTerm == latest.Term && LastLogIndex > latest.Index
 }

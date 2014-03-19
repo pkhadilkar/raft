@@ -3,7 +3,7 @@ package raftImpl
 import (
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
-	//	"fmt"
+		"fmt"
 	"github.com/pkhadilkar/cluster"
 	"strconv"
 	"time"
@@ -44,7 +44,7 @@ func (s *raftServer) lead() {
 				} else {
 					m, found = matchIndex.Get(e.Pid)
 					if !found {
-						panic("Next index not found for follower " + strconv.Itoa(e.Pid))
+						panic("Match index not found for follower " + strconv.Itoa(e.Pid))
 					}
 				}
 
@@ -81,9 +81,11 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 			if !ok {
 				panic("nextIndex not found for follower " + strconv.Itoa(f))
 			}
-			if lastIndex >= n {
+			if lastIndex != 0 && lastIndex >= n {
 				// send a new AppendEntry
 				prevIndex := n - 1
+				fmt.Println("LastIndex: " + strconv.FormatInt(lastIndex, 10))
+				fmt.Println("prevIndex: " + strconv.FormatInt(prevIndex, 10))
 				prevTerm := s.localLog.Get(prevIndex).Term
 				ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
 				ae.LeaderCommit = s.commitIndex.Get()

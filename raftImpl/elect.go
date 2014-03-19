@@ -40,7 +40,6 @@ func (s *raftServer) serve() {
 				s.handleRequestVote(e.Pid, &rv) // reset election timeout here too ? To avoid concurrent elections ?
 			}
 
-			// TODO handle EntryReply message
 
 		case <-s.eTimeout.C:
 			// received timeout on election timer
@@ -65,9 +64,10 @@ func (s *raftServer) startElection() {
 	s.writeToLog("Number of peers: " + strconv.Itoa(len(peers)))
 	votes := make(map[int]bool) // map to store received votes
 	votes[s.server.Pid()] = true
-	s.voteFor(s.server.Pid(), s.Term())
+	//s.voteFor(s.server.Pid(), s.Term())
 	for s.State() == CANDIDATE {
-		s.incrTerm()                                                                                   // increment term for current
+		s.incrTerm() // increment term for current
+		s.voteFor(s.server.Pid(), s.Term())
 		candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange)) // random timeout used by Raft authors
 		s.sendRequestVote()
 		s.writeToLog("Sent RequestVote message " + strconv.Itoa(int(candidateTimeout)))
@@ -98,14 +98,12 @@ func (s *raftServer) startElection() {
 				s.writeToLog("Received re-election timeout")
 				acc = true
 			default:
-				time.Sleep(1 * time.Millisecond) // sleep to avoid busy looping
+				time.Sleep(NICE * time.Millisecond)
 			}
 
 			if acc {
-				s.eTimeout.Reset(candidateTimeout * time.Millisecond) // start re-election timer
 				break
 			}
 		}
 	}
 }
-
