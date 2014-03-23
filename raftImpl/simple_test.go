@@ -54,13 +54,36 @@ func TestElect(t *testing.T) {
 
 	if leaderId == NONE {
 		t.Errorf("No leader was chosen")
+		return
 	}
 
 	fmt.Println("Leader pid: " + strconv.Itoa(leaderId))
 
 	// replicate an entry
-	_ = "Woah, it works !!"
+	data := "Woah, it works !!"
+	leader := raftServers[leaderId]
 	
+	leader.Outbox() <- data
+
+	var follower raft.Raft = nil
+	
+	for i, server := range raftServers {
+		fmt.Println(strconv.Itoa(i))
+		if i > 0 && server.Pid() != leaderId {
+			follower = server
+			break
+		}
+	}
+
+	select {
+		case msg := <- follower.Inbox() :
+		fmt.Println("Received message: ")
+		fmt.Println(msg)
+	case <- time.After(15 * time.Second):
+		fmt.Println("Message replication took more than 15 seconds !")
+		
+	}
+
 }
 
 // deleteState deletes persistent state on

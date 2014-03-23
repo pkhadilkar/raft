@@ -3,14 +3,14 @@ package raftImpl
 import (
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
-		"fmt"
+	"fmt"
 	"github.com/pkhadilkar/cluster"
 	"strconv"
 	"time"
 )
 
 // leader's implementation for raft
-
+ 
 // lead function is called when server is a leader
 // assume that initial heartbeat has been sent
 func (s *raftServer) lead() {
@@ -18,6 +18,8 @@ func (s *raftServer) lead() {
 	// launch a goroutine to handle followersFormatInt(
 	follower := s.followers()
 	nextIndex, matchIndex := s.initLeader(follower)
+
+	fmt.Println("Leader is " + strconv.Itoa(s.Pid()))
 
 	go s.handleFollowers(follower, nextIndex, matchIndex)
 	go s.updateCommitIndex(follower, matchIndex)
@@ -27,8 +29,9 @@ func (s *raftServer) lead() {
 			s.writeToLog("Sending hearbeats")
 			s.sendHeartBeat()
 			s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
-		case msg := <-s.Inbox():
+		case msg := <-s.outbox:
 			// received message from state machine
+			s.writeToLog("Received message from state machine layer")
 			s.localLog.Append(&raft.LogEntry{Term: s.Term(), Data: msg})
 		case e := <-s.server.Inbox():
 			raftMsg := e.Msg
@@ -50,8 +53,10 @@ func (s *raftServer) lead() {
 
 				if entryReply.Success {
 					// update nextIndex for follower
-					nextIndex.Set(e.Pid, max(n+1, entryReply.LogIndex+1))
-					matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
+					if entryReply.LogIndex != HEARTBEAT {
+						nextIndex.Set(e.Pid, max(n+1, entryReply.LogIndex+1))
+						matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
+					}
 				} else if s.Term() >= entryReply.Term {
 					nextIndex.Set(e.Pid, n-1)
 				} else {
@@ -75,7 +80,7 @@ func (s *raftServer) lead() {
 // about new messages and lagging followers catch up
 func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIntMap, matchIndex *utils.SyncIntIntMap) {
 	for s.State() == LEADER {
-		for f, _ := range followers {
+		for _, f := range followers {
 			lastIndex := s.localLog.TailIndex()
 			n, ok := nextIndex.Get(f)
 			if !ok {
@@ -86,7 +91,10 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 				prevIndex := n - 1
 				fmt.Println("LastIndex: " + strconv.FormatInt(lastIndex, 10))
 				fmt.Println("prevIndex: " + strconv.FormatInt(prevIndex, 10))
-				prevTerm := s.localLog.Get(prevIndex).Term
+				var prevTerm int64 = -1
+				if prevIndex != -1 {
+					prevTerm = s.localLog.Get(prevIndex).Term
+				}
 				ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
 				ae.LeaderCommit = s.commitIndex.Get()
 				ae.Entry = *s.localLog.Get(n)
@@ -101,7 +109,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 // TODO: Error handling
 func (s *raftServer) followers() []int {
 	peers := s.server.Peers()
-	follower := make([]int, len(peers))
+	follower := make([]int, len(peers) - 1)
 	i := 0
 	for _, srvr := range peers {
 		if srvr != s.server.Pid() {
@@ -109,6 +117,7 @@ func (s *raftServer) followers() []int {
 			i++
 		}
 	}
+
 	return follower
 }
 
@@ -127,7 +136,7 @@ func (s *raftServer) updateCommitIndex(followers []int, matchIndex *utils.SyncIn
 			}
 
 			i := 1
-			for f, _ := range followers {
+			for _, f := range followers {
 				if j, _ := matchIndex.Get(f); j >= N {
 					i++
 					upto = max(upto, j)

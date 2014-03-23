@@ -41,8 +41,10 @@ func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 		s.leaderId.Set(ae.LeaderId)
 		if isHeartbeat(&ae.Entry) {
 			// heartbeat
+			ae.Entry.Index = HEARTBEAT
 			acc = true
 		} else if s.localLog.Exists(ae.PrevLogIndex) && s.localLog.Get(ae.PrevLogIndex).Term == ae.PrevLogTerm {
+			s.writeToLog("Non heartbeat message")
 			if s.localLog.Exists(ae.Entry.Index) && s.localLog.Get(ae.Entry.Index).Term != ae.Entry.Term {
 				// existing entry conflicts with the entry from the leader
 				s.localLog.DiscardFrom(ae.Entry.Index)
@@ -74,7 +76,7 @@ func (s *raftServer) logApply() {
 	for {
 		if s.commitIndex.Get() > s.lastApplied.Get() {
 			N := s.lastApplied.Get() + 1 // lastApplied is accessed only here
-			s.Outbox() <- s.localLog.Get(N).Data
+			s.inbox <- s.localLog.Get(N)
 			s.writeToLog("Applied log entry at index " + strconv.FormatInt(N, 10))
 			s.lastApplied.Set(N)
 		}
@@ -90,3 +92,4 @@ func (s *raftServer) isMoreUpToDate(LastLogIndex int64, LastLogTerm int64) bool 
 	}
 	return LastLogTerm > latest.Term || LastLogTerm == latest.Term && LastLogIndex > latest.Index
 }
+

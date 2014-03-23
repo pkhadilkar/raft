@@ -2,19 +2,19 @@ package raft
 
 // Raft object interface.
 // Term returns current server term
-// isLeader returns true on leader and false on followers
 
 type Raft interface {
 	Term() int64
 	Leader() int
+	Pid() int	
+
+	//Mailbox for state machine layer above to receive commands. These
+	//are guaranteed to have been replicated on a majority
+	Inbox() <-chan *LogEntry
 
 	// Mailbox for state machine layer above to send commands of any
 	// kind, and to have them replicated by raft.  If the server is not
 	// the leader, the message will be silently dropped.
-	Inbox() <-chan *LogEntry
-
-	//Mailbox for state machine layer above to receive commands. These
-	//are guaranteed to have been replicated on a majority
 	Outbox() chan<- interface{}
 
 	//Remove items from 0 .. index (inclusive), and reclaim disk
