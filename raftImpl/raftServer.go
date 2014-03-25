@@ -21,9 +21,9 @@ import (
 
 const (
 	bufferSize = 100
-	NotVoted = -1
-	NONE = -1
-	HEARTBEAT = -1 // LogIndex to send when replying to a heartbeat message
+	NotVoted   = -1
+	NONE       = -1
+	HEARTBEAT  = -2 // LogIndex to send when replying to a heartbeat message
 )
 
 //TODO: Use separate locks for state and term

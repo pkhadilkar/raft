@@ -5,18 +5,17 @@ import (
 	"github.com/pkhadilkar/cluster"
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/llog"
+	"os"
 	"strconv"
 	"testing"
 	"time"
-	"os"
 )
-
 
 // TestElect tests normal behavior that leader should
 // be elected under normal condition and everyone
 // should agree upon current leader
 func TestElect(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 500, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable"}
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 700, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
 	deleteState(raftConf.StableStoreDirectoryPath)
@@ -62,11 +61,11 @@ func TestElect(t *testing.T) {
 	// replicate an entry
 	data := "Woah, it works !!"
 	leader := raftServers[leaderId]
-	
+
 	leader.Outbox() <- data
 
 	var follower raft.Raft = nil
-	
+
 	for i, server := range raftServers {
 		fmt.Println(strconv.Itoa(i))
 		if i > 0 && server.Pid() != leaderId {
@@ -76,12 +75,12 @@ func TestElect(t *testing.T) {
 	}
 
 	select {
-		case msg := <- follower.Inbox() :
+	case msg := <-follower.Inbox():
 		fmt.Println("Received message: ")
 		fmt.Println(msg)
-	case <- time.After(15 * time.Second):
+	case <-time.After(15 * time.Second):
 		fmt.Println("Message replication took more than 15 seconds !")
-		
+
 	}
 
 }

@@ -24,6 +24,7 @@ func (s *raftServer) replyTo(to int, msg interface{}) {
 // in this server routine.
 func (s *raftServer) serve() {
 	s.writeToLog("Started serve")
+	go s.logApply()
 	for {
 		select {
 		case e := <-s.server.Inbox():
@@ -32,14 +33,11 @@ func (s *raftServer) serve() {
 			if ae, ok := msg.(AppendEntry); ok { // AppendEntry
 				acc := s.handleAppendEntry(e.Pid, &ae)
 				if acc {
-					candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange))
-					// reset election timer if valid message received from server
-					s.eTimeout.Reset(candidateTimeout * time.Millisecond)
+					s.resetElectionTimeout()
 				}
 			} else if rv, ok := msg.(RequestVote); ok { // RequestVote
 				s.handleRequestVote(e.Pid, &rv) // reset election timeout here too ? To avoid concurrent elections ?
 			}
-
 
 		case <-s.eTimeout.C:
 			// received timeout on election timer

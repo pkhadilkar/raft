@@ -70,6 +70,14 @@ func max(x int64, y int64) int64 {
 	return larger
 }
 
+func min(x int64, y int64) int64 {
+	smaller := x
+	if y < x {
+		smaller = y
+	}
+	return smaller
+}
+
 func isHeartbeat(entry *raft.LogEntry) bool {
 	return *entry == raft.LogEntry{}
 }

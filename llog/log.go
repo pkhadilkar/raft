@@ -77,7 +77,7 @@ func (l *LogStore) TailIndex() int64 {
 // Exists checks if an entry exists in log
 // index is the index of the log entry
 func (l *LogStore) Exists(index int64) bool {
-	return index < l.nextIndex
+	return index > 0 && index < l.nextIndex
 }
 
 // DiscardFrom discards all entries from

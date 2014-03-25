@@ -1,16 +1,16 @@
 package raftImpl
 
 import (
-	"github.com/pkhadilkar/raft"
-	"github.com/pkhadilkar/raft/utils"
 	"fmt"
 	"github.com/pkhadilkar/cluster"
+	"github.com/pkhadilkar/raft"
+	"github.com/pkhadilkar/raft/utils"
 	"strconv"
 	"time"
 )
 
 // leader's implementation for raft
- 
+
 // lead function is called when server is a leader
 // assume that initial heartbeat has been sent
 func (s *raftServer) lead() {
@@ -22,11 +22,11 @@ func (s *raftServer) lead() {
 	fmt.Println("Leader is " + strconv.Itoa(s.Pid()))
 
 	go s.handleFollowers(follower, nextIndex, matchIndex)
-	go s.updateCommitIndex(follower, matchIndex)
+	go s.updateLeaderCommitIndex(follower, matchIndex)
 	for s.State() == LEADER {
 		select {
 		case <-s.hbTimeout.C:
-			s.writeToLog("Sending hearbeats")
+			//s.writeToLog("Sending hearbeats")
 			s.sendHeartBeat()
 			s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
 		case msg := <-s.outbox:
@@ -56,8 +56,10 @@ func (s *raftServer) lead() {
 					if entryReply.LogIndex != HEARTBEAT {
 						nextIndex.Set(e.Pid, max(n+1, entryReply.LogIndex+1))
 						matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
+						//s.writeToLog("Received confirmation from " + strconv.Itoa(e.Pid))
 					}
 				} else if s.Term() >= entryReply.Term {
+					fmt.Println("Decrementing term. " + strconv.FormatInt(entryReply.Term, 10))
 					nextIndex.Set(e.Pid, n-1)
 				} else {
 					s.setState(FOLLOWER)
@@ -89,19 +91,21 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 			if lastIndex != 0 && lastIndex >= n {
 				// send a new AppendEntry
 				prevIndex := n - 1
-				fmt.Println("LastIndex: " + strconv.FormatInt(lastIndex, 10))
-				fmt.Println("prevIndex: " + strconv.FormatInt(prevIndex, 10))
+				//fmt.Println("Follower: " + strconv.Itoa(f) + "LastIndex: " + strconv.FormatInt(lastIndex, 10))
+				//fmt.Println("prevIndex: " + strconv.FormatInt(prevIndex, 10))
 				var prevTerm int64 = -1
+				// n = 0 when we add first entry to the log
 				if prevIndex != -1 {
 					prevTerm = s.localLog.Get(prevIndex).Term
 				}
 				ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}
 				ae.LeaderCommit = s.commitIndex.Get()
 				ae.Entry = *s.localLog.Get(n)
+				s.writeToLog("Replicating entry " + strconv.FormatInt(n, 10))
 				s.server.Outbox() <- &cluster.Envelope{Pid: f, Msg: ae}
 			}
 		}
-		time.Sleep(NICE * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -109,7 +113,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 // TODO: Error handling
 func (s *raftServer) followers() []int {
 	peers := s.server.Peers()
-	follower := make([]int, len(peers) - 1)
+	follower := make([]int, len(peers)-1)
 	i := 0
 	for _, srvr := range peers {
 		if srvr != s.server.Pid() {
@@ -123,7 +127,7 @@ func (s *raftServer) followers() []int {
 
 // respondToClient replies to the client when
 // an entry is replicated on majority of servers
-func (s *raftServer) updateCommitIndex(followers []int, matchIndex *utils.SyncIntIntMap) {
+func (s *raftServer) updateLeaderCommitIndex(followers []int, matchIndex *utils.SyncIntIntMap) {
 
 	for s.State() == LEADER {
 		N := s.commitIndex.Get() + 1
@@ -144,6 +148,7 @@ func (s *raftServer) updateCommitIndex(followers []int, matchIndex *utils.SyncIn
 			}
 			// followers do not include Leader
 			if entry := s.localLog.Get(N); i > (len(followers)+1)/2 && entry.Term == s.Term() {
+				s.writeToLog("Updating commitIndex to " + strconv.FormatInt(N, 10))
 				s.commitIndex.Set(N)
 			}
 			N++
@@ -154,7 +159,9 @@ func (s *raftServer) updateCommitIndex(followers []int, matchIndex *utils.SyncIn
 
 // sendHeartBeat sends heartbeat messages to followers
 func (s *raftServer) sendHeartBeat() {
-	e := &cluster.Envelope{Pid: cluster.BROADCAST, Msg: &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid()}}
+	ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid()}
+	ae.LeaderCommit = s.commitIndex.Get()
+	e := &cluster.Envelope{Pid: cluster.BROADCAST, Msg: ae}
 	s.server.Outbox() <- e
 }
 
