@@ -18,7 +18,7 @@ func (s *raftServer) lead() {
 	// launch a goroutine to handle followersFormatInt(
 	follower := s.followers()
 	nextIndex, matchIndex := s.initLeader(follower)
-
+	s.leaderId.Set(s.server.Pid())
 	fmt.Println("Leader is " + strconv.Itoa(s.Pid()))
 
 	go s.handleFollowers(follower, nextIndex, matchIndex)

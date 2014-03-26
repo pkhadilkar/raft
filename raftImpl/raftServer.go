@@ -52,7 +52,7 @@ type raftServer struct {
 	sync.RWMutex                     // mutex to protect the state
 	inbox        chan *raft.LogEntry // inbox for raft
 	outbox       chan interface{}    // outbox for raft, inbox for upper layer
-	localLog     *llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
+	localLog     llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
 	commitIndex  *utils.AtomicI64    // index of the highest entry known to be committed
 	lastApplied  *utils.AtomicI64    // index of the last entry applied to the log
 	leaderId     *utils.AtomicInt    // leader's PID
@@ -170,12 +170,10 @@ func (s *raftServer) Pid() int {
 func (s *raftServer) incrTerm() {
 	s.state.VotedFor.Set(NotVoted)
 	s.state.Term.Set(s.state.Term.Get() + 1)
-	// TODO: Is persistState necessary here ?
 	s.persistState()
 }
 
-//TODO: Load current term from persistent storage
-func New(clusterServer cluster.Server, l *llog.LogStore, configFile string) (raft.Raft, error) {
+func New(clusterServer cluster.Server, l llog.LogStore, configFile string) (raft.Raft, error) {
 	raftConfig, err := ReadConfig(configFile)
 	if err != nil {
 		fmt.Println("Error in reading config file.")
@@ -201,7 +199,7 @@ func getLog(s *raftServer, logDirPath string) error {
 //  clusterServer : Server object of cluster API. cluster.Server provides message send
 //                  receive along with other facilities such as finding peers
 //  raftConfig    : Raft configuration object
-func NewWithConfig(clusterServer cluster.Server, l *llog.LogStore, raftConfig *RaftConfig) (raft.Raft, error) {
+func NewWithConfig(clusterServer cluster.Server, l llog.LogStore, raftConfig *RaftConfig) (raft.Raft, error) {
 	s := raftServer{currentState: &utils.AtomicInt{Value: FOLLOWER}, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	s.server = clusterServer
 	s.config = raftConfig

@@ -15,7 +15,7 @@ import (
 // be elected under normal condition and everyone
 // should agree upon current leader
 func TestElect(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 700, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 1500, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
 	deleteState(raftConf.StableStoreDirectoryPath)

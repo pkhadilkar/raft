@@ -12,6 +12,7 @@ package llog
 
 import (
 	"github.com/pkhadilkar/raft"
+	"encoding/gob"
 )
 
 type LogStore interface {
@@ -43,3 +44,6 @@ type LogStore interface {
 }
 
 
+func init() {
+	gob.Register(raft.LogEntry{})
+}
