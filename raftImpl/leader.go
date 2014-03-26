@@ -169,7 +169,7 @@ func (s *raftServer) sendHeartBeat() {
 func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.SyncIntIntMap) {
 	nextIndex := utils.CreateSyncIntMap()
 	matchIndex := utils.CreateSyncIntMap()
-	nextLogEntry := s.localLog.TailIndex()
+	nextLogEntry := s.localLog.TailIndex() + 1
 	for _, f := range followers {
 		nextIndex.Set(f, nextLogEntry)
 		matchIndex.Set(f, 0)

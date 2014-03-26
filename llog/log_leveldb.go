@@ -35,7 +35,6 @@ func Create(location string) (LogStore, error) {
 	logStore.readOpts = levigo.NewReadOptions()
 	logStore.writeOpts = levigo.NewWriteOptions()
 	logStore.writeOpts.SetSync(true)
-	db.Put(logStore.writeOpts, int64ToBytes(0), logEntryToBytes(&raft.LogEntry{Index: -1, Term: -1}))
 	return LogStore(logStore), err
 }
 
