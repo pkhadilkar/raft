@@ -15,7 +15,7 @@ import (
 // be elected under normal condition and everyone
 // should agree upon current leader
 func TestElect(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 700, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable"}
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 700, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
 	deleteState(raftConf.StableStoreDirectoryPath)
@@ -37,7 +37,12 @@ func TestElect(t *testing.T) {
 			t.Errorf("Error in creating cluster server. " + err.Error())
 			return
 		}
-		logStore := llog.Create()
+		
+		logStore, err := llog.Create(raftConf.RaftLogDirectoryPath + "/" + strconv.Itoa(i))
+		if err != nil {
+			t.Errorf("Error in creating log. " + err.Error())
+			return
+		}
 
 		s, err := NewWithConfig(clusterServer, logStore, raftConf)
 		if err != nil {

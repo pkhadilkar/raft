@@ -14,6 +14,7 @@ import (
 // Config struct represents all config information
 // required to start a server. It represents
 // information in config file in structure
+// TODO: Remove Directory paths for logs as they are dependency injection
 type RaftConfig struct {
 	MemberRegSocket          string // socket to connect to , to register a cluster server
 	PeerSocket               string // socket to connect to , to get a list of cluster peers
@@ -21,6 +22,7 @@ type RaftConfig struct {
 	HbTimeoutInMillis        int64  // timeout to sent periodic heartbeats
 	LogDirectoryPath         string // path to log directory
 	StableStoreDirectoryPath string // path to directory that can be used to store persistent information
+	RaftLogDirectoryPath string // path to directory that is used to store Raft log
 }
 
 type PersistentState struct {

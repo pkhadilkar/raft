@@ -7,8 +7,11 @@ import (
 )
 
 func TestDefault(t *testing.T) {
-	l := &LogStore{}
-	l.Init()
+	l, err := Create("/tmp/localLog")
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
 	to := int64(100)
 	for i := int64(1); i <= to; i += 1 {
 		l.Append(&raft.LogEntry{Term: i / 10, Index: i, Data: "Add"})

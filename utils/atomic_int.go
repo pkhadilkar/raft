@@ -27,6 +27,20 @@ func (a *AtomicI64) Set(num int64) {
 	a.mutex.Unlock()
 }
 
+// Incr increments value by 1
+func (a *AtomicI64) Incr() {
+	a.mutex.Lock()
+	a.Value += 1
+	a.mutex.Unlock()
+}
+
+// Decr decrements value by 1
+func (a *AtomicI64) Decr() {
+	a.mutex.Lock()
+	a.Value -= 1
+	a.mutex.Unlock()
+}
+
 // AtomicInt is an int protected by a mutex
 type AtomicInt struct {
 	Value int
