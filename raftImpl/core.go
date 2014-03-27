@@ -52,7 +52,7 @@ func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 			// apply entry to local log
 			s.localLog.Append(&ae.Entry)
 			acc = true
-		} 
+		}
 
 		if acc {
 			s.updateCommitIndex(ae)

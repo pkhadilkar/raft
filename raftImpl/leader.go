@@ -91,7 +91,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 			if !ok {
 				panic("nextIndex not found for follower " + strconv.Itoa(f))
 			}
-			
+
 			unlocked, ok := aeToken.Get(f)
 
 			if !ok {

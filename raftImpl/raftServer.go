@@ -52,7 +52,7 @@ type raftServer struct {
 	sync.RWMutex                     // mutex to protect the state
 	inbox        chan *raft.LogEntry // inbox for raft
 	outbox       chan interface{}    // outbox for raft, inbox for upper layer
-	localLog     llog.LogStore      // LogStore dependency. Used to  implement shared log abstraction
+	localLog     llog.LogStore       // LogStore dependency. Used to  implement shared log abstraction
 	commitIndex  *utils.AtomicI64    // index of the highest entry known to be committed
 	lastApplied  *utils.AtomicI64    // index of the last entry applied to the log
 	leaderId     *utils.AtomicInt    // leader's PID

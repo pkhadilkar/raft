@@ -18,7 +18,7 @@ func TestElect(t *testing.T) {
 	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 1500, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
-	deleteState(raftConf.StableStoreDirectoryPath)
+	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath)
 
 	// launch cluster proxy servers
 	cluster.NewProxyWithConfig(RaftToClusterConf(raftConf))
@@ -37,7 +37,7 @@ func TestElect(t *testing.T) {
 			t.Errorf("Error in creating cluster server. " + err.Error())
 			return
 		}
-		
+
 		logStore, err := llog.Create(raftConf.RaftLogDirectoryPath + "/" + strconv.Itoa(i))
 		if err != nil {
 			t.Errorf("Error in creating log. " + err.Error())
@@ -53,7 +53,7 @@ func TestElect(t *testing.T) {
 	}
 
 	// there should be a leader after sufficiently long duration
-	time.Sleep(15 * time.Second)
+	time.Sleep(5 * time.Second)
 	leaderId := raftServers[2].Leader()
 
 	if leaderId == NONE {
@@ -72,7 +72,6 @@ func TestElect(t *testing.T) {
 	var follower raft.Raft = nil
 
 	for i, server := range raftServers {
-		fmt.Println(strconv.Itoa(i))
 		if i > 0 && server.Pid() != leaderId {
 			follower = server
 			break
@@ -90,26 +89,26 @@ func TestElect(t *testing.T) {
 
 }
 
-// deleteState deletes persistent state on
-// the disk for each server
-// parameters:
-// baseDir: Path to base directory
-// which contains state of all
-// the servers on the disk
-func deleteState(baseDir string) {
-	base, err := os.Open(baseDir)
+
+func initState(stableStoreBaseDir string, logBaseDir string) {
+	err := os.RemoveAll(stableStoreBaseDir)
 	if err != nil {
-		fmt.Println("Error in opening directory.")
-		return
+		panic("Cannot remove " + stableStoreBaseDir)
 	}
-	fis, err := base.Readdir(-1) // read information for all files in the directory
-	for _, f := range fis {
-		err = os.Remove(baseDir + "/" + f.Name())
-		if err != nil {
-			fmt.Println("Error in deleting the file")
-			fmt.Println(err.Error())
-			return
-		}
+
+	err = os.RemoveAll(logBaseDir)
+
+	if err != nil {
+		panic("Cannot remove " + logBaseDir)
 	}
-	return
+
+	err = os.Mkdir(stableStoreBaseDir, os.ModeDir | 0764)
+	if err != nil {
+		panic("Cannot create " + stableStoreBaseDir + "." + err.Error())
+	}
+
+	err = os.Mkdir(logBaseDir, os.ModeDir | 0764)
+	if err != nil {
+		panic("Cannot create " + logBaseDir + "." + err.Error())
+	}
 }

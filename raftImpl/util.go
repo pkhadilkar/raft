@@ -22,7 +22,7 @@ type RaftConfig struct {
 	HbTimeoutInMillis        int64  // timeout to sent periodic heartbeats
 	LogDirectoryPath         string // path to log directory
 	StableStoreDirectoryPath string // path to directory that can be used to store persistent information
-	RaftLogDirectoryPath string // path to directory that is used to store Raft log
+	RaftLogDirectoryPath     string // path to directory that is used to store Raft log
 }
 
 type PersistentState struct {
