@@ -5,16 +5,17 @@ import (
 	"github.com/pkhadilkar/cluster"
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/llog"
-	"os"
 	"strconv"
 	"testing"
 	"time"
 )
 
-// TestReplicate tests that a single
-// message is correctly replicated
-func _TestReplicate(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 1500, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
+// TestReplicateScale tests that 1000 messages
+// are replicated in reasonable amount of time
+// Reasonable is considering 5 servers doing
+// disk IO for each message
+func TestReplicateScale(t *testing.T) {
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9990", PeerSocket: "127.0.0.1:9019", TimeoutInMillis: 1500, HbTimeoutInMillis: 100, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
 	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath)
@@ -63,10 +64,8 @@ func _TestReplicate(t *testing.T) {
 	fmt.Println("Leader pid: " + strconv.Itoa(leaderId))
 
 	// replicate an entry
-	data := "Woah, it works !!"
+	// data := "Woah, it works !!"
 	leader := raftServers[leaderId]
-
-	leader.Outbox() <- data
 
 	var follower raft.Raft = nil
 
@@ -77,37 +76,47 @@ func _TestReplicate(t *testing.T) {
 		}
 	}
 
-	select {
-	case msg := <-follower.Inbox():
-		fmt.Println("Received message: ")
-		fmt.Println(msg)
-	case <-time.After(15 * time.Second):
-		fmt.Println("Message replication took more than 15 seconds !")
+	count := 1000
 
+	// launch a goroutine to consume messages for other followers and leader
+	for i, server := range raftServers {
+		if i > 0 && server.Pid() != follower.Pid() {
+			go readMessages(server)
+		}
 	}
 
+	done := make(chan bool, 1)
+
+	go replicateVerification(follower, count, done)
+
+	for count != 0 {
+		leader.Outbox() <- strconv.Itoa(count)
+		count -= 1
+	}
+	
+
+	select {
+	case  <-done :
+	case <-time.After(5 * time.Minute):
+		t.Errorf("Message replication took more than 5 minutes !")
+
+	}
 }
 
 
-func initState(stableStoreBaseDir string, logBaseDir string) {
-	err := os.RemoveAll(stableStoreBaseDir)
-	if err != nil {
-		panic("Cannot remove " + stableStoreBaseDir)
+func readMessages(s raft.Raft) {
+	for {
+		<- s.Inbox()
 	}
+}
 
-	err = os.RemoveAll(logBaseDir)
-
-	if err != nil {
-		panic("Cannot remove " + logBaseDir)
+func replicateVerification(s raft.Raft, count int, done chan bool) {
+	for count > 0 {
+		 <- s.Inbox()
+		count--
+		if count % 100 == 0 {
+			fmt.Println(count)
+		}
 	}
-
-	err = os.Mkdir(stableStoreBaseDir, os.ModeDir | 0764)
-	if err != nil {
-		panic("Cannot create " + stableStoreBaseDir + "." + err.Error())
-	}
-
-	err = os.Mkdir(logBaseDir, os.ModeDir | 0764)
-	if err != nil {
-		panic("Cannot create " + logBaseDir + "." + err.Error())
-	}
+	done <- true
 }

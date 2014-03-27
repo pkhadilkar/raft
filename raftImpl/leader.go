@@ -114,7 +114,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 				s.server.Outbox() <- &cluster.Envelope{Pid: f, Msg: ae}
 			}
 		}
-		time.Sleep(NICE * 10 * time.Millisecond)
+		time.Sleep(NICE * time.Millisecond)
 	}
 }
 
