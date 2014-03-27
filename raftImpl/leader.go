@@ -1,7 +1,6 @@
 package raftImpl
 
 import (
-	"fmt"
 	"github.com/pkhadilkar/cluster"
 	"github.com/pkhadilkar/raft"
 	"github.com/pkhadilkar/raft/utils"
@@ -17,11 +16,10 @@ func (s *raftServer) lead() {
 	s.hbTimeout.Reset(time.Duration(s.config.HbTimeoutInMillis) * time.Millisecond)
 	// launch a goroutine to handle followersFormatInt(
 	follower := s.followers()
-	nextIndex, matchIndex := s.initLeader(follower)
+	nextIndex, matchIndex, aeToken := s.initLeader(follower)
 	s.leaderId.Set(s.server.Pid())
-	fmt.Println("Leader is " + strconv.Itoa(s.Pid()))
 
-	go s.handleFollowers(follower, nextIndex, matchIndex)
+	go s.handleFollowers(follower, nextIndex, matchIndex, aeToken)
 	go s.updateLeaderCommitIndex(follower, matchIndex)
 	for s.State() == LEADER {
 		select {
@@ -54,12 +52,12 @@ func (s *raftServer) lead() {
 				if entryReply.Success {
 					// update nextIndex for follower
 					if entryReply.LogIndex != HEARTBEAT {
+						aeToken.Set(e.Pid, 1)
 						nextIndex.Set(e.Pid, max(n+1, entryReply.LogIndex+1))
 						matchIndex.Set(e.Pid, max(m, entryReply.LogIndex))
 						//s.writeToLog("Received confirmation from " + strconv.Itoa(e.Pid))
 					}
 				} else if s.Term() >= entryReply.Term {
-					fmt.Println("Decrementing term. " + strconv.FormatInt(entryReply.Term, 10))
 					nextIndex.Set(e.Pid, n-1)
 				} else {
 					s.setState(FOLLOWER)
@@ -80,7 +78,12 @@ func (s *raftServer) lead() {
 
 // handleFollowers ensures that followers are informed
 // about new messages and lagging followers catch up
-func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIntMap, matchIndex *utils.SyncIntIntMap) {
+// AppendEntry and AppendEntryResponses occur in
+// lockstep. aeToken is used to implement mutex like
+// behaviour to ensure that a new AppendEntry message
+// is sent only when response to previous AppendEntry
+// message is received
+func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIntMap, matchIndex *utils.SyncIntIntMap, aeToken *utils.SyncIntIntMap) {
 	for s.State() == LEADER {
 		for _, f := range followers {
 			lastIndex := s.localLog.TailIndex()
@@ -88,11 +91,17 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 			if !ok {
 				panic("nextIndex not found for follower " + strconv.Itoa(f))
 			}
-			if lastIndex != 0 && lastIndex >= n {
+			
+			unlocked, ok := aeToken.Get(f)
+
+			if !ok {
+				panic("aeToken not found for follower " + strconv.Itoa(f))
+			}
+
+			if lastIndex != 0 && lastIndex >= n && unlocked == 1 {
+				aeToken.Set(f, 0)
 				// send a new AppendEntry
 				prevIndex := n - 1
-				//fmt.Println("Follower: " + strconv.Itoa(f) + "LastIndex: " + strconv.FormatInt(lastIndex, 10))
-				//fmt.Println("prevIndex: " + strconv.FormatInt(prevIndex, 10))
 				var prevTerm int64 = -1
 				// n = 0 when we add first entry to the log
 				if prevIndex != -1 {
@@ -105,7 +114,7 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 				s.server.Outbox() <- &cluster.Envelope{Pid: f, Msg: ae}
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(NICE * 10 * time.Millisecond)
 	}
 }
 
@@ -166,13 +175,15 @@ func (s *raftServer) sendHeartBeat() {
 }
 
 // initLeader initializes important leader data structures
-func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.SyncIntIntMap) {
+func (s *raftServer) initLeader(followers []int) (*utils.SyncIntIntMap, *utils.SyncIntIntMap, *utils.SyncIntIntMap) {
 	nextIndex := utils.CreateSyncIntMap()
 	matchIndex := utils.CreateSyncIntMap()
+	aeToken := utils.CreateSyncIntMap() // acts like mutex in producer-consumer
 	nextLogEntry := s.localLog.TailIndex() + 1
 	for _, f := range followers {
 		nextIndex.Set(f, nextLogEntry)
 		matchIndex.Set(f, 0)
+		aeToken.Set(f, 1)
 	}
-	return nextIndex, matchIndex
+	return nextIndex, matchIndex, aeToken
 }

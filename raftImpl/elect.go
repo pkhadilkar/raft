@@ -39,6 +39,10 @@ func (s *raftServer) serve() {
 				s.handleRequestVote(e.Pid, &rv) // reset election timeout here too ? To avoid concurrent elections ?
 			}
 
+		case _ = <-s.outbox:
+			// non leaders ignore the message from state machine
+			// TODO: Send error entry with leader's Pid to client
+
 		case <-s.eTimeout.C:
 			// received timeout on election timer
 			s.writeToLog("Starting Election")

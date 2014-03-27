@@ -5,7 +5,9 @@ package utils
 import (
 	"sync"
 )
-
+// SyncIntIntMap is a synchronized implementation of
+// map from int to int64. The data types are chosen
+// for convenience of current implementation
 type SyncIntIntMap struct {
 	m            map[int]int64 // internal map
 	sync.RWMutex               // mutex to synchronize access to map
