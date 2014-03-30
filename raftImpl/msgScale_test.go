@@ -15,10 +15,10 @@ import (
 // Reasonable is considering 5 servers doing
 // disk IO for each message
 func TestReplicateScale(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9990", PeerSocket: "127.0.0.1:9019", TimeoutInMillis: 1500, HbTimeoutInMillis: 100, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:8145", PeerSocket: "127.0.0.1:9100", TimeoutInMillis: 1500, HbTimeoutInMillis: 100, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
-	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath)
+	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath, raftConf.RaftLogDirectoryPath)
 
 	// launch cluster proxy servers
 	cluster.NewProxyWithConfig(RaftToClusterConf(raftConf))
@@ -32,7 +32,7 @@ func TestReplicateScale(t *testing.T) {
 
 	for i := 1; i <= serverCount; i += 1 {
 		// create cluster.Server
-		clusterServer, err := cluster.NewWithConfig(i, "127.0.0.1", 5000+i, RaftToClusterConf(raftConf))
+		clusterServer, err := cluster.NewWithConfig(i, "127.0.0.1", 7000+i, RaftToClusterConf(raftConf))
 		if err != nil {
 			t.Errorf("Error in creating cluster server. " + err.Error())
 			return
@@ -72,11 +72,12 @@ func TestReplicateScale(t *testing.T) {
 	for i, server := range raftServers {
 		if i > 0 && server.Pid() != leaderId {
 			follower = server
+			fmt.Println("Follower is " + strconv.Itoa(follower.Pid()))
 			break
 		}
 	}
 
-	count := 1000
+	count := 100
 
 	// launch a goroutine to consume messages for other followers and leader
 	for i, server := range raftServers {

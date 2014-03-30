@@ -102,9 +102,9 @@ func (s *raftServer) handleFollowers(followers []int, nextIndex *utils.SyncIntIn
 				aeToken.Set(f, 0)
 				// send a new AppendEntry
 				prevIndex := n - 1
-				var prevTerm int64 = -1
+				var prevTerm int64 = 0
 				// n = 0 when we add first entry to the log
-				if prevIndex != -1 {
+				if prevIndex > 0 {
 					prevTerm = s.localLog.Get(prevIndex).Term
 				}
 				ae := &AppendEntry{Term: s.Term(), LeaderId: s.server.Pid(), PrevLogIndex: prevIndex, PrevLogTerm: prevTerm}

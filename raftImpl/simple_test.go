@@ -17,7 +17,7 @@ func _TestReplicate(t *testing.T) {
 	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:9999", PeerSocket: "127.0.0.1:9009", TimeoutInMillis: 1500, HbTimeoutInMillis: 50, LogDirectoryPath: "logs", StableStoreDirectoryPath: "./stable", RaftLogDirectoryPath: "../LocalLog"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
-	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath)
+	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath, raftConf.RaftLogDirectoryPath)
 
 	// launch cluster proxy servers
 	cluster.NewProxyWithConfig(RaftToClusterConf(raftConf))
@@ -89,7 +89,7 @@ func _TestReplicate(t *testing.T) {
 }
 
 
-func initState(stableStoreBaseDir string, logBaseDir string) {
+func initState(stableStoreBaseDir string, logBaseDir string, raftLogDir string) {
 	err := os.RemoveAll(stableStoreBaseDir)
 	if err != nil {
 		panic("Cannot remove " + stableStoreBaseDir)
@@ -101,6 +101,12 @@ func initState(stableStoreBaseDir string, logBaseDir string) {
 		panic("Cannot remove " + logBaseDir)
 	}
 
+
+	err = os.RemoveAll(raftLogDir)
+	if err != nil {
+		panic("Cannot remove " + raftLogDir)
+	}
+
 	err = os.Mkdir(stableStoreBaseDir, os.ModeDir | 0764)
 	if err != nil {
 		panic("Cannot create " + stableStoreBaseDir + "." + err.Error())
@@ -109,5 +115,10 @@ func initState(stableStoreBaseDir string, logBaseDir string) {
 	err = os.Mkdir(logBaseDir, os.ModeDir | 0764)
 	if err != nil {
 		panic("Cannot create " + logBaseDir + "." + err.Error())
+	}
+
+	err = os.Mkdir(raftLogDir, os.ModeDir | 0764)
+	if err != nil {
+		panic("Cannot create " + raftLogDir + "." + err.Error())
 	}
 }

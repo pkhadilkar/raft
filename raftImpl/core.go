@@ -4,6 +4,7 @@ import (
 	"github.com/pkhadilkar/cluster"
 	"strconv"
 	"time"
+	"github.com/pkhadilkar/raft"
 )
 
 // this file contains functions common to all Raft servers
@@ -44,7 +45,7 @@ func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 			// heartbeat
 			ae.Entry.Index = HEARTBEAT
 			acc = true
-		} else if s.localLog.Exists(ae.PrevLogIndex) && s.localLog.Get(ae.PrevLogIndex).Term == ae.PrevLogTerm || (ae.PrevLogIndex == -1 && ae.PrevLogTerm == -1) {
+		} else if s.localLog.Exists(ae.PrevLogIndex) && s.localLog.Get(ae.PrevLogIndex).Term == ae.PrevLogTerm || (ae.PrevLogIndex == 0 && ae.PrevLogTerm == 0) {
 			if s.localLog.Exists(ae.Entry.Index) && s.localLog.Get(ae.Entry.Index).Term != ae.Entry.Term {
 				// existing entry conflicts with the entry from the leader
 				s.localLog.DiscardFrom(ae.Entry.Index)
@@ -68,6 +69,9 @@ func (s *raftServer) handleAppendEntry(from int, ae *AppendEntry) bool {
 func (s *raftServer) sendRequestVote() {
 	rv := &RequestVote{Term: s.Term(), CandidateId: s.server.Pid()}
 	tailEntry := s.localLog.Tail()
+	if tailEntry == nil {
+		tailEntry = &raft.LogEntry{}
+	}
 	rv.LastLogTerm = tailEntry.Term
 	rv.LastLogIndex = tailEntry.Index
 	e := &cluster.Envelope{Pid: cluster.BROADCAST, Msg: rv}
@@ -92,7 +96,7 @@ func (s *raftServer) logApply() {
 func (s *raftServer) isMoreUpToDate(LastLogIndex int64, LastLogTerm int64) bool {
 	s.writeToLog("LastLogIndex: " + strconv.FormatInt(LastLogIndex, 10) + "\tLastLogTerm: " + strconv.FormatInt(LastLogTerm, 10))
 	latest := s.localLog.Tail()
-	if latest.Term == -1 && latest.Index == -1 { // log has no entries yet
+	if latest == nil || latest.Term == -1 && latest.Index == -1 { // log has no entries yet
 		return true
 	}
 	return LastLogTerm > latest.Term || LastLogTerm == latest.Term && LastLogIndex > latest.Index

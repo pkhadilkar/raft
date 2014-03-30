@@ -18,8 +18,6 @@ const BASE = 10
 type levelDbLogStore struct {
 	localDb *levigo.DB // reference to LevelDB object
 	nextIndex *utils.AtomicI64 // index of the next log entry
-	readOpts *levigo.ReadOptions // cached ReadOptions
-	writeOpts *levigo.WriteOptions // cached WriteOptions
 }
 
 // Create creates a new Log at location
@@ -31,10 +29,8 @@ func Create(location string) (LogStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	opts.Close()
 	logStore := &levelDbLogStore{localDb: db, nextIndex: &utils.AtomicI64{Value: 1}}
-	logStore.readOpts = levigo.NewReadOptions()
-	logStore.writeOpts = levigo.NewWriteOptions()
-	logStore.writeOpts.SetSync(true)
 	return LogStore(logStore), err
 }
 
@@ -44,12 +40,15 @@ func Create(location string) (LogStore, error) {
 // server itself need not be aware of index of the log
 // while appending a new entry
 func (l *levelDbLogStore) Append(entry *raft.LogEntry) error {
+	writeOpts := levigo.NewWriteOptions()
+	writeOpts.SetSync(true)
+	defer writeOpts.Close()
 	entry.Index = l.nextIndex.Get()
-	l.nextIndex.Incr()
 	data := logEntryToBytes(entry)
 	key := entry.Index
 	// insert values in LevelDb
-	err := l.localDb.Put(l.writeOpts, int64ToBytes(key), data)
+	err := l.localDb.Put(writeOpts, int64ToBytes(key), data)
+	l.nextIndex.Incr() // increment entry only after a write
 	return err
 }
 
@@ -59,11 +58,14 @@ func (l *levelDbLogStore) Append(entry *raft.LogEntry) error {
 // correspond to index in internal implementation
 // TODO: Add error check here
 func (l *levelDbLogStore) Get(index int64) *raft.LogEntry {
-	data, err := l.localDb.Get(l.readOpts, int64ToBytes(index))
+	readOpts := levigo.NewReadOptions()
+	defer readOpts.Close()
+	data, err := l.localDb.Get(readOpts, int64ToBytes(index))
 	// for now panic locally. Propogate this error when fixed
 	if err != nil {
 		panic(err.Error())
 	}
+
 	if data == nil {
 		return nil
 	}
@@ -93,11 +95,14 @@ func (l *levelDbLogStore) Exists(index int64) bool {
 // log index onwards (inclusive)
 // TODO: Propogate error to higher layers
 func (l *levelDbLogStore) DiscardFrom(index int64) {
+	writeOpts := levigo.NewWriteOptions()
+	writeOpts.SetSync(true)
+	defer writeOpts.Close()
 	writeBatch := levigo.NewWriteBatch()
 	for i := index; i <= l.TailIndex(); i += 1 {
 		writeBatch.Delete(int64ToBytes(i))
 	}
-	err := l.localDb.Write(l.writeOpts, writeBatch)
+	err := l.localDb.Write(writeOpts, writeBatch)
 	if err != nil {
 		panic("Error in DiscardFrom")
 	}
