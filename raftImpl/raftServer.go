@@ -234,4 +234,6 @@ func init() {
 	gob.Register(EntryReply{})
 	gob.Register(GrantVote{})
 	gob.Register(RequestVote{})
+	// LogEntry is used in Log
+	gob.Register(raft.LogEntry{})
 }
