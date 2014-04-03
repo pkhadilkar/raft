@@ -20,6 +20,11 @@ func TestReplicateScale(t *testing.T) {
 	// delete stored state to avoid unnecessary effect on following test cases
 	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath, raftConf.RaftLogDirectoryPath)
 
+	/*if raftConf.MemberRegSocket == "127.0.0.1:8145" {
+		fmt.Println("Returning")
+		return
+	}*/
+
 	// launch cluster proxy servers
 	cluster.NewProxyWithConfig(RaftToClusterConf(raftConf))
 
@@ -94,28 +99,26 @@ func TestReplicateScale(t *testing.T) {
 		leader.Outbox() <- strconv.Itoa(count)
 		count -= 1
 	}
-	
 
 	select {
-	case  <-done :
+	case <-done:
 	case <-time.After(5 * time.Minute):
 		t.Errorf("Message replication took more than 5 minutes !")
 
 	}
 }
 
-
 func readMessages(s raft.Raft) {
 	for {
-		<- s.Inbox()
+		<-s.Inbox()
 	}
 }
 
 func replicateVerification(s raft.Raft, count int, done chan bool) {
 	for count > 0 {
-		 <- s.Inbox()
+		<-s.Inbox()
 		count--
-		if count % 100 == 0 {
+		if count%100 == 0 {
 			fmt.Println(count)
 		}
 	}

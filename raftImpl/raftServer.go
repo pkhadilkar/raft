@@ -121,6 +121,7 @@ func (s *raftServer) persistState() {
 	}
 	err = ioutil.WriteFile(s.config.StableStoreDirectoryPath+"/"+ServerFileName(s.server.Pid()), pStateBytes, UserReadWriteMode)
 	if err != nil {
+		fmt.Println(err.Error())
 		panic("Could not persist state to storage on file " + s.config.StableStoreDirectoryPath)
 	}
 }
@@ -221,7 +222,7 @@ func NewWithConfig(clusterServer cluster.Server, l llog.LogStore, raftConfig *Ra
 	if err != nil {
 		return nil, err
 	}
-	
+
 	go s.redeliverLogEntries()
 	go s.serve()
 	return raft.Raft(&s), err

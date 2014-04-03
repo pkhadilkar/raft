@@ -88,7 +88,6 @@ func _TestReplicate(t *testing.T) {
 
 }
 
-
 func initState(stableStoreBaseDir string, logBaseDir string, raftLogDir string) {
 	err := os.RemoveAll(stableStoreBaseDir)
 	if err != nil {
@@ -101,23 +100,22 @@ func initState(stableStoreBaseDir string, logBaseDir string, raftLogDir string) 
 		panic("Cannot remove " + logBaseDir)
 	}
 
-
 	err = os.RemoveAll(raftLogDir)
 	if err != nil {
 		panic("Cannot remove " + raftLogDir)
 	}
 
-	err = os.Mkdir(stableStoreBaseDir, os.ModeDir | 0764)
+	err = os.Mkdir(stableStoreBaseDir, os.ModeDir|0764)
 	if err != nil {
 		panic("Cannot create " + stableStoreBaseDir + "." + err.Error())
 	}
 
-	err = os.Mkdir(logBaseDir, os.ModeDir | 0764)
+	err = os.Mkdir(logBaseDir, os.ModeDir|0764)
 	if err != nil {
 		panic("Cannot create " + logBaseDir + "." + err.Error())
 	}
 
-	err = os.Mkdir(raftLogDir, os.ModeDir | 0764)
+	err = os.Mkdir(raftLogDir, os.ModeDir|0764)
 	if err != nil {
 		panic("Cannot create " + raftLogDir + "." + err.Error())
 	}
