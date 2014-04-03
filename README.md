@@ -21,6 +21,8 @@ Test
 + **Message scale test (msgScale_test.go)**:
 This test sends 1000 messages to leader and verifies that a follower receives all the entries. Note that each of the message is doing a disk write and all Raft servers run locally.
 
++ **Leader Partition and Rejoining (leaderSeparation_test.go)** : This test case first waits for Raft to elect a leader. It then simulates leader crash by ignoring all messages to/from leader and checks that the remaining servers elect a new leader. It then re-introduces old leader into the cluster and checks that the old leader reverts back to the follower.
+
 + **Majority Minority Partition (part_test.go)** : This test case first waits for Raft to elect a leader. It then creates a minority network partition that contains leader and a follower and checks that the servers in majority partition elect a new leader.
 
 

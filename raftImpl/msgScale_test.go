@@ -20,11 +20,6 @@ func TestReplicateScale(t *testing.T) {
 	// delete stored state to avoid unnecessary effect on following test cases
 	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath, raftConf.RaftLogDirectoryPath)
 
-	/*if raftConf.MemberRegSocket == "127.0.0.1:8145" {
-		fmt.Println("Returning")
-		return
-	}*/
-
 	// launch cluster proxy servers
 	cluster.NewProxyWithConfig(RaftToClusterConf(raftConf))
 

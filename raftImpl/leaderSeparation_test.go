@@ -11,10 +11,13 @@ import (
 	"time"
 )
 
-// TestPartition tests that in case of network partition
-// the partition with majority servers elect leader
-func TestPartition(t *testing.T) {
-	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:8124", PeerSocket: "127.0.0.1:9987", TimeoutInMillis: 1500, HbTimeoutInMillis: 150, LogDirectoryPath: "logs1", StableStoreDirectoryPath: "./stable1", RaftLogDirectoryPath: "../LocalLog1"}
+// TestLeaderSeparation tests that new leader gets elected when
+// elected leader crashes. Leader crash is simulated using
+// PseudoCluster service. It then re-enables the links between
+// old leader and rest of the cluster and checks whether the
+// old leader reverts back to follower.
+func TestLeaderSeparation(t *testing.T) {
+	raftConf := &RaftConfig{MemberRegSocket: "127.0.0.1:7334", PeerSocket: "127.0.0.1:3434", TimeoutInMillis: 1500, HbTimeoutInMillis: 150, LogDirectoryPath: "logs4", StableStoreDirectoryPath: "./stable4", RaftLogDirectoryPath: "../LocalLog4"}
 
 	// delete stored state to avoid unnecessary effect on following test cases
 	initState(raftConf.StableStoreDirectoryPath, raftConf.LogDirectoryPath, raftConf.RaftLogDirectoryPath)
@@ -32,7 +35,7 @@ func TestPartition(t *testing.T) {
 
 	for i := 1; i <= serverCount; i += 1 {
 		// create cluster.Server
-		clusterServer, err := cluster.NewWithConfig(i, "127.0.0.1", 8500+i, RaftToClusterConf(raftConf))
+		clusterServer, err := cluster.NewWithConfig(i, "127.0.0.1", 12600+i, RaftToClusterConf(raftConf))
 		pseudoCluster := test.NewPseudoCluster(clusterServer)
 		if err != nil {
 			t.Errorf("Error in creating cluster server. " + err.Error())
@@ -55,53 +58,61 @@ func TestPartition(t *testing.T) {
 	}
 
 	// wait for leader to be elected
-	time.Sleep(20 * time.Second)
+	time.Sleep(4 * time.Second)
 	count := 0
 	oldLeader := 0
 	for i := 1; i <= serverCount; i += 1 {
 		if raftServers[i].Leader() == raftServers[i].Pid() {
+			fmt.Println("Server " + strconv.Itoa(i) + " was chosen as leader.")
 			oldLeader = i
 			count++
 		}
 	}
 	if count != 1 {
 		t.Errorf("No leader was chosen in 1 minute")
-		return
 	}
 
-	// isolate Leader and any one follower
-	follower := 0
+	// isolate Leader
 	for i := 1; i <= serverCount; i += 1 {
-		if i != oldLeader {
-			follower = i
-			break
+		if raftServers[i].Pid() != oldLeader {
+			pseudoClusters[oldLeader].AddToInboxFilter(raftServers[i].Pid())
+			pseudoClusters[oldLeader].AddToOutboxFilter(raftServers[i].Pid())
 		}
 	}
-	fmt.Println("Server " + strconv.Itoa(follower) + " was chosen as follower in minority partition")
-	for i := 1; i <= serverCount; i += 1 {
-		pseudoClusters[oldLeader].AddToInboxFilter(raftServers[i].Pid())
-		pseudoClusters[oldLeader].AddToOutboxFilter(raftServers[i].Pid())
-		pseudoClusters[follower].AddToInboxFilter(raftServers[i].Pid())
-		pseudoClusters[follower].AddToOutboxFilter(raftServers[i].Pid())
-	}
-
+	// prevent broadcasts from leader too
 	pseudoClusters[oldLeader].AddToOutboxFilter(cluster.BROADCAST)
-	pseudoClusters[follower].AddToOutboxFilter(cluster.BROADCAST)
-
 	// wait for other servers to discover that leader
 	// has crashed and to elect a new leader
-	time.Sleep(20 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	count = 0
 	for i := 1; i <= serverCount; i += 1 {
-
-		if i != oldLeader && i != follower && raftServers[i].Leader() == raftServers[i].Pid() {
-			fmt.Println("Server " + strconv.Itoa(i) + " was chosen as new leader in majority partition.")
+		if i != oldLeader && raftServers[i].Leader() == raftServers[i].Pid() {
+			fmt.Println("Server " + strconv.Itoa(i) + " was chosen as new leader.")
 			count++
 		}
 	}
 	// new leader must be chosen
 	if count != 1 {
-		t.Errorf("No leader was chosen in majority partition")
+		t.Errorf("No leader was chosen")
+	}
+
+	// re-enable link between old leader and other servers
+	for i := 1; i <= serverCount; i += 1 {
+		s := raftServers[i]
+		if i != oldLeader {
+			pseudoClusters[oldLeader].RemoveFromInboxFilter(s.Pid())
+			pseudoClusters[oldLeader].RemoveFromOutboxFilter(s.Pid())
+		}
+	}
+
+	// wait for oldLeader to discover new leader
+	time.Sleep(2 * time.Second)
+
+	// state of the old leader must be FOLLOWER
+	// since a new leader has been elected
+	// with a greater term
+	if raftServers[oldLeader].Leader() == raftServers[oldLeader].Pid() {
+		t.Errorf("Old leader is still in leader state.")
 	}
 }
