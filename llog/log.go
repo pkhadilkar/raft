@@ -12,7 +12,6 @@ package llog
 
 import (
 	"github.com/pkhadilkar/raft"
-	"encoding/gob"
 )
 
 type LogStore interface {
@@ -34,6 +33,10 @@ type LogStore interface {
 	// and 0 if the log does not have any entries
 	TailIndex() int64
 
+	// returns index of the first entry in the log
+	// and 0 if the log does not have any entries
+	HeadIndex() int64
+
 	// Exists checks if an entry exists in log
 	// index is the index of the log entry
 	Exists(index int64) bool
@@ -43,7 +46,3 @@ type LogStore interface {
 	DiscardFrom(index int64)
 }
 
-
-func init() {
-	gob.Register(raft.LogEntry{})
-}

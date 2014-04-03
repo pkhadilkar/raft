@@ -84,7 +84,7 @@ func (s *raftServer) sendRequestVote() {
 func (s *raftServer) logApply() {
 	for {
 		if s.commitIndex.Get() > s.lastApplied.Get() {
-			N := s.lastApplied.Get() + 1 // lastApplied is accessed only here
+			N := s.lastApplied.Get() + 1 
 			s.inbox <- s.localLog.Get(N)
 			s.writeToLog("Applied log entry at index " + strconv.FormatInt(N, 10))
 			s.lastApplied.Set(N)
@@ -112,4 +112,21 @@ func (s *raftServer) updateCommitIndex(ae *AppendEntry) {
 func (s *raftServer) resetElectionTimeout() {
 	candidateTimeout := time.Duration(s.config.TimeoutInMillis + s.rng.Int63n(RandomTimeoutRange))
 	s.eTimeout.Reset(candidateTimeout * time.Millisecond)
+}
+
+// redeliverLogEntries redelivers non-discarded log
+// entries on startup
+func (s *raftServer) redeliverLogEntries() {
+	headIndex := s.localLog.HeadIndex()
+	tailIndex := s.commitIndex.Get()
+	i := int64(0)
+	for i = headIndex; i <= tailIndex ; i += 1 {
+		s.inbox <- s.localLog.Get(i)
+		if (i - headIndex) % 10 == 0 && i > s.lastApplied.Get(){
+			s.lastApplied.Set(i)
+		}
+	}
+	if tailIndex < s.lastApplied.Get() {
+		s.lastApplied.Set(tailIndex)
+	}
 }

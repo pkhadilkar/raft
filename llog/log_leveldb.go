@@ -18,6 +18,7 @@ const BASE = 10
 type levelDbLogStore struct {
 	localDb *levigo.DB // reference to LevelDB object
 	nextIndex *utils.AtomicI64 // index of the next log entry
+	firstIndex *utils.AtomicI64 // index of the first log entry
 }
 
 // Create creates a new Log at location
@@ -30,7 +31,7 @@ func Create(location string) (LogStore, error) {
 		return nil, err
 	}
 	opts.Close()
-	logStore := &levelDbLogStore{localDb: db, nextIndex: &utils.AtomicI64{Value: 1}}
+	logStore := &levelDbLogStore{localDb: db, nextIndex: &utils.AtomicI64{Value: 1}, firstIndex: &utils.AtomicI64{Value: 0}}
 	return LogStore(logStore), err
 }
 
@@ -49,6 +50,9 @@ func (l *levelDbLogStore) Append(entry *raft.LogEntry) error {
 	// insert values in LevelDb
 	err := l.localDb.Put(writeOpts, int64ToBytes(key), data)
 	l.nextIndex.Incr() // increment entry only after a write
+	if l.firstIndex.Get() == 0 {
+		l.firstIndex.Set(1)
+	}
 	return err
 }
 
@@ -81,6 +85,12 @@ func (l *levelDbLogStore) Tail() *raft.LogEntry {
 // and 0 if the log does not have any entries
 func (l *levelDbLogStore) TailIndex() int64 {
 	return (l.nextIndex.Get() - 1)
+}
+
+// returns index of the first entry in the log
+// and 0 if the log does not have any entries
+func (l *levelDbLogStore) HeadIndex() int64 {
+	return l.firstIndex.Get()
 }
 
 // Exists checks if an entry exists in log

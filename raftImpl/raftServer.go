@@ -221,7 +221,8 @@ func NewWithConfig(clusterServer cluster.Server, l llog.LogStore, raftConfig *Ra
 	if err != nil {
 		return nil, err
 	}
-
+	
+	go s.redeliverLogEntries()
 	go s.serve()
 	return raft.Raft(&s), err
 }
