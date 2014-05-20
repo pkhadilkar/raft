@@ -1,14 +1,14 @@
 Raft Implementation
 =====================
 
-Raft Leader election implements leader election component of [Raft](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf). Raft servers use [cluster](http://github.com/pkhadilkar/cluster) service to send and receive messages. This project currently includes only election component and not log messages. The server term and voted for information is persisted on stable storage. 
+Raft implements [Raft](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf). Raft servers use [cluster](http://github.com/pkhadilkar/cluster) service to send and receive messages. This project currently includes only election component and not log messages. The server term and voted for information is persisted on stable storage. 
 
 Raft servers use [LevelDB](https://code.google.com/p/leveldb/) for log storage. LevelDB installation should be done prior to using this package. This package uses [Levigo] (https://github.com/jmhodges/levigo). See Levigo's README for building LevelDB.
 
 Installation
 -------------
 ```
-$ go get github.com/pkhadilkar/raft-leader-election
+$ go get github.com/pkhadilkar/raft
 $ # cd into directory containing raft/raftImpl
 $ go test
 ```
